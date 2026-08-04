@@ -1,0 +1,11 @@
+node_modules
+.next
+out
+data/*.sqlite
+data/*.sqlite-journal
+.env.local
+*.log
+data/*.sqlite-wal
+data/*.sqlite-shm
+tsconfig.tsbuildinfo
+.DS_Store

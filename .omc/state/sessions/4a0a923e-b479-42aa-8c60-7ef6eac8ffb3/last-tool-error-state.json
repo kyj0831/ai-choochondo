@@ -1,0 +1,7 @@
+{
+  "tool_name": "mcp__Claude_Browser__preview_logs",
+  "tool_input_preview": "{\"serverId\":\"3c27658f-86b0-45ae-8cb8-ee5422e06c75\",\"lines\":40}",
+  "error": "serverId \"3c27658f-86b0-45ae-8cb8-ee5422e06c75\" not found — it may be stale or belong to another session. Call preview_list to get current ids.",
+  "timestamp": "2026-08-01T13:04:53.664Z",
+  "retry_count": 1
+}

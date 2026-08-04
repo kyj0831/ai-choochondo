@@ -1,0 +1,71 @@
+{
+  "agents": [
+    {
+      "agent_id": "a3ee1153e27e23c90",
+      "agent_type": "unknown",
+      "started_at": "2026-07-19T03:25:34.160Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-07-19T03:25:34.160Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "a2beaa2a9e3674b0f",
+      "agent_type": "unknown",
+      "started_at": "2026-07-19T03:46:14.642Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-07-19T03:46:14.642Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "a3b25e813c7526535",
+      "agent_type": "unknown",
+      "started_at": "2026-07-19T12:26:40.383Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-07-19T12:26:40.383Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "a91c04c30c41112a9",
+      "agent_type": "unknown",
+      "started_at": "2026-07-19T23:18:40.471Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-07-19T23:18:40.471Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "a5bd5d8243a3a0b87",
+      "agent_type": "unknown",
+      "started_at": "2026-07-20T02:01:47.582Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-07-20T02:01:47.582Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "acc7257441734a90a",
+      "agent_type": "unknown",
+      "started_at": "2026-07-24T01:48:46.054Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-07-24T01:48:46.054Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "a117ada9470a164ca",
+      "agent_type": "unknown",
+      "started_at": "2026-07-24T01:56:28.085Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-07-24T01:56:28.085Z",
+      "duration_ms": 0
+    }
+  ],
+  "total_spawned": 0,
+  "total_completed": 7,
+  "total_failed": 0,
+  "last_updated": "2026-07-24T01:56:28.302Z"
+}
