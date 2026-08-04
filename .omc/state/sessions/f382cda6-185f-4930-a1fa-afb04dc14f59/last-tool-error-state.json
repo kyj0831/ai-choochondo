@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd \\\"/Users/gge/Documents/Claude/Projects/AI 추천도 진단\\\"\\necho \\\"=== 실제 OpenAI로 프로젝트 생성 + 질문 생성 테스트 ===\\\"\\nPID=$(curl -s -X POST http://localhost:3000/api/projects -H \\\"Content-Type: applicat...",
-  "error": "Exit code 1\n=== 실제 OpenAI로 프로젝트 생성 + 질문 생성 테스트 ===\nPID=d19781e0-ede0-4552-ac79-cde90217f5bf\n--- 질문 생성 (실제 GPT 호출, 10~20초 소요될 수 있음) ---\nERROR: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
-  "timestamp": "2026-07-24T01:55:50.942Z",
-  "retry_count": 2
-}
