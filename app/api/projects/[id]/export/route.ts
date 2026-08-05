@@ -51,8 +51,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     // 요청 시점에만 로드한다. 최상단 import로 두면 puppeteer가 없는 환경에서
     // 이 라우트와 무관한 빌드까지 실패한다.
     const puppeteer = (await import("puppeteer")).default;
+    // 배포 환경(Nixpacks)에서는 시스템 chromium 경로를 지정한다.
+    // 미설정이면 puppeteer 번들 Chromium을 쓴다(로컬 개발).
+    const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || undefined;
     const browser = await puppeteer.launch({
       headless: true,
+      executablePath,
       args: ["--no-sandbox", "--disable-setuid-sandbox", "--font-render-hinting=none"],
     });
 

@@ -81,7 +81,9 @@ export function buildReportHtml(input: ReportHtmlInput): string {
   @page { size: A4; margin: 16mm 14mm; }
   * { box-sizing: border-box; }
   body {
-    font-family: "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Malgun Gothic", sans-serif;
+    /* 배포(리눅스)에는 Noto Sans CJK만 있다. 빠지면 한글이 두부(□)로 렌더링된다. */
+    font-family: "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR",
+                 "Noto Sans CJK KR", "Noto Sans CJK", "Malgun Gothic", sans-serif;
     color: #0f172a; margin: 0; font-size: 10.5pt; line-height: 1.65;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
