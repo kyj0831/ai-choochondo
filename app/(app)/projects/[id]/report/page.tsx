@@ -117,9 +117,17 @@ export default function ReportPage({ params }: { params: { id: string } }) {
             {report.run_number}차 진단 · {new Date(report.created_at).toLocaleString("ko-KR")}
           </p>
         </div>
-        <button onClick={reanalyze} disabled={reanalyzing} className="btn-secondary text-xs">
-          {reanalyzing ? "재분석 중..." : "동일 조건 재분석"}
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <a
+            href={`/api/projects/${params.id}/export?format=pdf&run=${report.id}`}
+            className="btn-secondary text-xs"
+          >
+            PDF 내려받기
+          </a>
+          <button onClick={reanalyze} disabled={reanalyzing} className="btn-secondary text-xs">
+            {reanalyzing ? "재분석 중..." : "동일 조건 재분석"}
+          </button>
+        </div>
       </div>
 
       {/* 1. 한 줄 진단 + 2. 총점/신뢰도 */}
