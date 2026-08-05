@@ -13,3 +13,7 @@ tsconfig.tsbuildinfo
 # OMC 운영 아티팩트 (.omc/skills는 예외적으로 커밋 대상)
 .omc/*
 !.omc/skills/
+
+# 하위 경로에 생기는 OMC 아티팩트도 제외
+**/.omc/
+!.omc/skills/
