@@ -124,6 +124,16 @@ export function deleteQuery(id: string) {
   getDb().prepare(`UPDATE queries SET deleted = 1 WHERE id = ?`).run(id);
 }
 
+/**
+ * 시스템이 생성한 질문만 비운다. 사용자가 직접 추가·수정한 질문은 남긴다.
+ * 질문 세트를 다시 뽑을 때 이전 질문이 누적되는 것을 막는다.
+ */
+export function clearSystemQueries(projectId: string) {
+  getDb()
+    .prepare(`UPDATE queries SET deleted = 1 WHERE project_id = ? AND created_by = 'system'`)
+    .run(projectId);
+}
+
 export function updateQuery(id: string, data: Partial<Pick<QueryRow, "text" | "importance">>) {
   const db = getDb();
   const current = db.prepare(`SELECT * FROM queries WHERE id = ?`).get(id) as QueryRow | undefined;

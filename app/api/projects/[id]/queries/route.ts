@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getProject, insertQueries, listQueries, updateProjectStatus } from "@/lib/repo";
+import { clearSystemQueries, getProject, insertQueries, listQueries, updateProjectStatus } from "@/lib/repo";
 import { generateQueries } from "@/lib/llm";
 import { EntityType } from "@/lib/types";
 
@@ -8,9 +8,13 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 }
 
 // Generate query set via LLM (FR-010)
+// body.replace=true면 기존 시스템 생성 질문을 먼저 비운다.
+// 없으면 재생성할 때마다 질문이 누적되어 질의군 커버리지 점수가 왜곡된다.
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const project = getProject(params.id);
   if (!project) return NextResponse.json({ error: "not found" }, { status: 404 });
+
+  const body = await req.json().catch(() => ({}));
 
   try {
     const generated = await generateQueries({
@@ -21,6 +25,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       categories: JSON.parse(project.categories),
       audiences: JSON.parse(project.audiences),
     });
+    // 사용자가 직접 추가·수정한 질문은 남기고 시스템 생성분만 비운다.
+    if (body.replace) clearSystemQueries(params.id);
+
     const rows = insertQueries(
       params.id,
       generated.map((q) => ({

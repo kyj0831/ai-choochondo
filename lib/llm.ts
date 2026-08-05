@@ -26,14 +26,62 @@ export interface GeneratedQuery {
 export async function generateQueries(input: GenerateQueriesInput): Promise<GeneratedQuery[]> {
   if (isMockMode()) return mockQueries(input);
 
-  const system = `당신은 AI 검색 가시성 진단을 위한 질의 설계자다. 직접 검색과 범주형 추천 검색을 분리하고,
-실제 사용자가 AI 챗봇/검색에 입력할 법한 자연어 질문을 생성한다.
-"recommend"/"situational" 타입 질문에는 브랜드 이름을 절대 포함하지 마라 (카테고리·지역·문제 해결형 질문이어야 한다).
-JSON만 출력하라. 스키마: {"queries": [{"text": string, "type": "direct"|"recommend"|"explain"|"compare"|"situational", "sub_category": string, "importance": 1|2|3}]}
-- type "direct": 정확히 3개, 브랜드명 포함
-- type "recommend" 또는 "situational": 합쳐서 10개, 브랜드명 미포함, 카테고리/지역/대상/문제 상황 기반 추천 질문
-- type "explain": 3개, 설명 정확도 검증용 (직업/업종/지역/서비스/실적을 묻는 질문)
-sub_category는 recommend/situational 질문의 의도 그룹을 나타내는 짧은 한글 라벨(예: "전문분야 추천", "지역 기반 추천", "가격대 비교")로, 서로 다른 관점을 커버하도록 다양화하라.`;
+  const system = `당신은 AI 검색 가시성 진단을 위한 질의 설계자다.
+생성한 질문은 실제로 ChatGPT·Perplexity 같은 AI에 입력되고, 그 답변에 이 브랜드가
+등장하는지로 점수를 매긴다. 따라서 모든 질문은 "판정 가능"해야 한다.
+
+## 절대 규칙 1 — 개수는 반드시 채운다
+아래 타입별 개수를 **정확히** 지켜라. 총 16개다.
+품질 기준에 걸려 질문을 버렸다면 **반드시 다른 각도로 새로 만들어 채워라.**
+개수를 줄이는 것은 허용되지 않는다. 표본이 부족하면 진단 신뢰도가 떨어진다.
+
+## 절대 규칙 2 — 판정 가능성
+recommend / situational / compare 질문은 **AI가 답할 때 특정 업체·사람·가게의 고유명사를
+후보로 나열하게 되는 질문**이어야 한다.
+질문을 만든 뒤 스스로 물어라: "AI가 이 질문에 답하면서 특정 업체 이름을 나열할까?"
+아니라면 그 질문은 버리고 **같은 개수만큼 다른 각도로 새로 만들어라.**
+일반론이 답으로 나오는 질문은 브랜드가 등장할 수 없어 점수를 부당하게 깎는다.
+
+버려야 할 질문(일반론이 답이 되는 것):
+- "OO를 선택할 때 고려사항은 무엇인가요?"  ← 조언이 답
+- "효과적인 OO 전략은 무엇인가요?"          ← 방법론이 답
+- "OO를 찾을 때 어떤 질문을 해야 하나요?"   ← 체크리스트가 답
+- "OO의 가격대는 어떻게 되나요?"            ← 시세 정보가 답
+- "OO의 주요 역할은 무엇인가요?"            ← 정의가 답
+
+좋은 질문(고유명사가 답에 나열되는 것):
+- "서울에서 OO 잘하는 곳 추천해줘"
+- "OO가 필요한데 어디에 맡기면 좋을까?"
+- "OO 분야에서 유명한 사람 알려줘"
+- "국내 OO 업체 중 어디가 괜찮아?"
+
+## 타입별 지시
+- "direct" — 정확히 3개. **브랜드명 필수 포함.** 브랜드 자체를 묻는 질문
+  (예: "OO는 어떤 곳이야?", "OO에 대해 알려줘", "OO 어디에 있어?")
+- "recommend" — 6개. **브랜드명 절대 미포함.** 카테고리·지역·대상 기반 추천 요청.
+- "situational" — 4개. **브랜드명 절대 미포함.**
+  구체적인 상황·문제를 제시하고 "그래서 어디에/누구에게 맡기면 좋겠냐"고 묻는 형태.
+  상황만 설명하고 끝내지 말고 반드시 추천을 요구하라.
+  (예: "시리즈A 앞두고 언론 노출을 늘려야 하는데 어디에 맡기면 좋을까?")
+- "explain" — 3개. **브랜드명 필수 포함.**
+  AI가 이 브랜드를 정확히 설명하는지 검증한다. 업계 일반 질문이 아니라
+  이 브랜드의 업종·지역·서비스·실적·최근 활동을 직접 묻는 질문이어야 한다.
+  (예: "OO의 주요 서비스는 뭐야?", "OO는 어디에서 활동해?", "OO의 대표 실적은?")
+
+## 다양성
+- 같은 카테고리 표현을 여러 질문에 반복하지 마라. 질의군이 겹치면 커버리지 점수가 왜곡된다.
+- recommend 6개는 서로 다른 각도여야 한다(지역 / 대상 / 목적 / 규모 / 전문성 / 평판 등).
+- 어투도 섞어라(존댓말·반말·짧은 검색어형).
+
+sub_category는 질문의 의도 그룹을 나타내는 짧은 한글 라벨
+(예: "지역 기반 추천", "대상 기반 추천", "전문성 기반 추천", "설명 검증").
+
+## 출력 전 자체 검증
+JSON을 내보내기 전에 반드시 개수를 세어 확인하라:
+direct 3개 + recommend 6개 + situational 4개 + explain 3개 = 총 16개.
+하나라도 모자라면 그 타입의 질문을 더 만들어 채운 뒤 출력하라.
+
+JSON만 출력하라. 스키마: {"queries": [{"text": string, "type": "direct"|"recommend"|"explain"|"compare"|"situational", "sub_category": string, "importance": 1|2|3}]}`;
 
   const user = `entity_name: ${input.brandName}
 entity_type: ${input.entityType}
@@ -42,7 +90,132 @@ categories: ${input.categories.join(", ") || "(미지정)"}
 audiences: ${input.audiences.join(", ") || "(미지정)"}`;
 
   const result = await callJSON<{ queries: GeneratedQuery[] }>(system, user);
-  return result.queries;
+  return ensureQueryCounts(result.queries ?? [], input);
+}
+
+/** 타입별 목표 개수. 표본이 15개 이상이어야 신뢰도 배지가 "높음"이 된다. */
+const TARGET_COUNTS: Partial<Record<QueryType, number>> = {
+  direct: 3,
+  recommend: 6,
+  situational: 4,
+  explain: 3,
+};
+
+/**
+ * LLM이 타입별 개수를 덜 만들어도 템플릿으로 채운다.
+ *
+ * 프롬프트로 개수를 지시해도 모델은 형태가 비슷한 질문(특히 direct)을
+ * 스스로 중복 제거해 줄여버린다. 표본 수는 신뢰도 배지와 커버리지 점수에
+ * 직접 영향을 주므로 코드에서 보장한다.
+ */
+export function ensureQueryCounts(
+  generated: GeneratedQuery[],
+  input: GenerateQueriesInput
+): GeneratedQuery[] {
+  const seen = new Set(generated.map((q) => normalizeText(q.text)));
+  const out = [...generated];
+
+  for (const [type, target] of Object.entries(TARGET_COUNTS) as [QueryType, number][]) {
+    const have = out.filter((q) => q.type === type).length;
+    if (have >= target) continue;
+
+    for (const candidate of fallbackQueries(type, input)) {
+      if (out.filter((q) => q.type === type).length >= target) break;
+      const key = normalizeText(candidate.text);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(candidate);
+    }
+  }
+
+  return out;
+}
+
+function normalizeText(s: string): string {
+  return s.replace(/\s+/g, "").replace(/[?!.,·]/g, "").toLowerCase();
+}
+
+/**
+ * 한글 조사를 앞 글자의 받침에 맞춰 고른다.
+ * 받침을 무시하면 "바다와하늘처럼는" 같은 문장이 고객에게 그대로 노출된다.
+ */
+function josa(word: string, withBatchim: string, withoutBatchim: string): string {
+  const last = word.trim().slice(-1);
+  const code = last.charCodeAt(0);
+  // 한글 음절 영역이 아니면(영문·숫자 등) 받침 없음으로 취급한다.
+  if (code < 0xac00 || code > 0xd7a3) return withoutBatchim;
+  return (code - 0xac00) % 28 !== 0 ? withBatchim : withoutBatchim;
+}
+
+const eun = (w: string) => `${w}${josa(w, "은", "는")}`;
+const i = (w: string) => `${w}${josa(w, "이", "가")}`;
+const eul = (w: string) => `${w}${josa(w, "을", "를")}`;
+
+/** 부족분을 채울 템플릿. 서로 다른 각도가 되도록 나열 순서를 잡았다. */
+function fallbackQueries(type: QueryType, input: GenerateQueriesInput): GeneratedQuery[] {
+  const name = input.brandName;
+  const region = input.region;
+  const cats = input.categories.length ? input.categories : ["전문 분야"];
+  const auds = input.audiences.length ? input.audiences : ["일반 고객"];
+
+  switch (type) {
+    case "direct":
+      return [
+        { text: `${eun(name)} 어떤 곳이야?`, type, sub_category: "직접 검색", importance: 3 },
+        { text: `${name}에 대해 알려줘`, type, sub_category: "직접 검색", importance: 3 },
+        { text: `${name} ${region}`, type, sub_category: "직접 검색", importance: 2 },
+        { text: `${name} 평판 어때?`, type, sub_category: "직접 검색", importance: 2 },
+      ];
+
+    case "explain":
+      return [
+        { text: `${name}의 주요 서비스는 무엇인가요?`, type, sub_category: "설명 검증", importance: 2 },
+        { text: `${eun(name)} 어느 지역에서 활동하나요?`, type, sub_category: "설명 검증", importance: 2 },
+        { text: `${name}의 대표 실적은 무엇인가요?`, type, sub_category: "설명 검증", importance: 2 },
+        { text: `${name}의 최근 활동은 무엇인가요?`, type, sub_category: "설명 검증", importance: 2 },
+      ];
+
+    case "recommend":
+      return [
+        ...cats.map((c) => ({
+          text: `${region}에서 ${c} 추천해줘`,
+          type,
+          sub_category: "지역 기반 추천",
+          importance: 3,
+        })),
+        ...cats.map((c) => ({
+          text: `${c} 중에 평판 좋은 곳 알려줘`,
+          type,
+          sub_category: "평판 기반 추천",
+          importance: 2,
+        })),
+        ...cats.map((c) => ({
+          text: `${c} 경험 많은 곳은 어디야?`,
+          type,
+          sub_category: "전문성 기반 추천",
+          importance: 2,
+        })),
+      ];
+
+    case "situational":
+      return [
+        ...auds.map((a) => ({
+          text: `${a}인데 ${i(cats[0])} 필요해. 어디에 맡기면 좋을까?`,
+          type,
+          sub_category: "대상 기반 추천",
+          importance: 3,
+        })),
+        ...cats.map((c) => ({
+          text: `${eul(c)} 처음 맡기려고 하는데 어디가 좋을지 추천해줘`,
+          type,
+          sub_category: "상황 기반 추천",
+          importance: 2,
+        })),
+      ];
+
+    default:
+      return [];
+  }
 }
 
 // Entity-type-specific query templates per PRD 3.3 (엔터티 유형별 질의 체계).
