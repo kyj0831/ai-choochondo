@@ -77,13 +77,21 @@ export function buildReportHtml(input: ReportHtmlInput): string {
 
   return `<!DOCTYPE html>
 <html lang="ko"><head><meta charset="utf-8"><title>${esc(project.brand_name)} AI 추천도 리포트</title>
+<!--
+  한글 웹폰트를 렌더링 시점에 불러온다.
+  배포 리눅스 이미지에는 한글 폰트가 없어 그대로 두면 전부 두부(□)가 된다.
+  Nix 폰트 패키지는 스냅샷마다 이름이 달라 빌드를 깨뜨리므로 웹폰트로 처리한다.
+  로컬(macOS)에서는 아래 시스템 폰트가 먼저 잡히므로 영향이 없다.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;800&display=swap" rel="stylesheet">
 <style>
   @page { size: A4; margin: 16mm 14mm; }
   * { box-sizing: border-box; }
   body {
-    /* 배포(리눅스)에는 Noto Sans CJK만 있다. 빠지면 한글이 두부(□)로 렌더링된다. */
     font-family: "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR",
-                 "Noto Sans CJK KR", "Noto Sans CJK", "Malgun Gothic", sans-serif;
+                 "Noto Sans CJK KR", "Malgun Gothic", sans-serif;
     color: #0f172a; margin: 0; font-size: 10.5pt; line-height: 1.65;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }

@@ -62,8 +62,13 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
     try {
       const page = await browser.newPage();
-      // HTML은 외부 리소스 없이 자체 완결이므로 load면 충분하다.
       await page.setContent(html, { waitUntil: "load" });
+      // 한글 웹폰트가 적용되기 전에 인쇄하면 글자가 두부(□)로 나온다.
+      // 폰트 로딩을 기다리되, 네트워크가 막힌 환경에서 무한정 대기하지 않도록 상한을 둔다.
+      await Promise.race([
+        page.evaluate(() => document.fonts.ready.then(() => undefined)),
+        new Promise((resolve) => setTimeout(resolve, 5000)),
+      ]);
       const pdf = await page.pdf({
         format: "A4",
         printBackground: true,
@@ -91,8 +96,18 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     }
   } catch (e) {
     console.error("[export] PDF 생성 실패:", e);
+    const msg = (e as Error).message ?? "";
+    // Chromium이 없거나 실행되지 않는 환경(배포 설정 누락 등)에서는
+    // 원인과 대안을 명확히 알려준다. 리포트 자체는 ?format=html로 볼 수 있다.
+    const chromiumMissing =
+      /ENOENT|Could not find|Failed to launch|shared librar|browser was not found/i.test(msg);
     return NextResponse.json(
-      { error: `PDF 생성에 실패했습니다: ${(e as Error).message}` },
+      {
+        error: chromiumMissing
+          ? "이 서버에서 PDF 변환기(Chromium)를 실행할 수 없습니다. 같은 주소에 ?format=html 을 붙이면 리포트를 웹페이지로 보고 브라우저 인쇄 기능으로 PDF로 저장할 수 있습니다."
+          : `PDF 생성에 실패했습니다: ${msg}`,
+        htmlFallback: `/api/projects/${params.id}/export?format=html${runId ? `&run=${runId}` : ""}`,
+      },
       { status: 500 }
     );
   }
