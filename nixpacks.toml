@@ -1,17 +1,20 @@
 # Railway(Nixpacks) 빌드 설정
 #
 # nixPkgs로 패키지를 지정하면 Nixpacks가 자동 감지한 Node 설정까지 덮어써
-# 이미지 빌드가 즉시 실패한다. 그래서 apt 패키지만 추가한다.
-# aptPkgs는 기존 설정에 더해지므로 Node 감지를 건드리지 않고,
-# Debian 패키지 이름은 스냅샷에 따라 달라지지 않는다.
+# 빌드가 깨진다. 그래서 apt 패키지만 더한다.
 #
 #   chromium        PDF 내보내기(puppeteer)용 브라우저
 #   fonts-noto-cjk  한글 폰트. 없으면 PDF의 한글이 두부(□)로 렌더링된다
+#
+# puppeteer가 설치 중 브라우저를 내려받지 않게 하는 설정은
+# .puppeteerrc.cjs에 둔다. 빌드 단계 환경변수는 npm install 시점에
+# 적용되지 않을 수 있어 신뢰할 수 없다.
 
 [phases.setup]
 aptPkgs = ["chromium", "fonts-noto-cjk"]
 
 [variables]
-# 위 시스템 chromium을 쓰므로 puppeteer가 자체 Chromium(약 180MB)을 받지 않게 한다.
-PUPPETEER_SKIP_DOWNLOAD = "true"
+# puppeteer 25는 Node 22.12 이상을 요구한다(package.json engines와 함께 지정).
+NIXPACKS_NODE_VERSION = "22"
+# 실행 시 사용할 chromium. 이 경로가 없으면 코드가 다른 후보를 찾는다.
 PUPPETEER_EXECUTABLE_PATH = "/usr/bin/chromium"

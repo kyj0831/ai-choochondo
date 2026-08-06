@@ -51,9 +51,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     // 요청 시점에만 로드한다. 최상단 import로 두면 puppeteer가 없는 환경에서
     // 이 라우트와 무관한 빌드까지 실패한다.
     const puppeteer = (await import("puppeteer")).default;
-    // 배포 환경(Nixpacks)에서는 시스템 chromium 경로를 지정한다.
-    // 미설정이면 puppeteer 번들 Chromium을 쓴다(로컬 개발).
-    const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || undefined;
+    const executablePath = await resolveChromium();
     const browser = await puppeteer.launch({
       headless: true,
       executablePath,
@@ -115,4 +113,34 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/**
+ * 실행할 Chromium을 찾는다.
+ *
+ * 배포 이미지에는 apt로 설치한 시스템 chromium을 쓰는데, 배포판에 따라
+ * 실행 파일 경로가 달라(chromium / chromium-browser 등) 한 곳으로 고정하면
+ * 환경이 바뀔 때마다 깨진다. 후보를 순서대로 확인하고, 아무것도 없으면
+ * undefined를 돌려줘 puppeteer 기본 동작(번들 브라우저)에 맡긴다.
+ */
+async function resolveChromium(): Promise<string | undefined> {
+  const { access } = await import("fs/promises");
+
+  const candidates = [
+    process.env.PUPPETEER_EXECUTABLE_PATH,
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/google-chrome",
+  ].filter((p): p is string => !!p);
+
+  for (const path of candidates) {
+    try {
+      await access(path);
+      return path;
+    } catch {
+      // 다음 후보로 넘어간다.
+    }
+  }
+  return undefined;
 }
