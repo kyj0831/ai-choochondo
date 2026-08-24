@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>AI 추천도 진단 리포트</title>
+<style>
+  /* ─────────────────────────────────────────────────────────
+     AI 추천도 진단 리포트 — A4 인쇄용 스타일
+     headless Chromium print-to-PDF 기준으로 검증됨.
+     쪽번호·머리말은 CSS 마진박스가 아니라 render.mjs의
+     headerTemplate/footerTemplate로 넣는다 (Chromium 제약).
+     ───────────────────────────────────────────────────────── */
+
+  :root {
+    --ink:        #16181d;
+    --ink-soft:   #4a4f5a;
+    --ink-mute:   #838a96;
+    --line:       #e2e5ea;
+    --line-soft:  #eef0f4;
+    --paper:      #ffffff;
+    --wash:       #f7f8fa;
+
+    --accent:     #0067b1;   /* 기본 액센트 — 화이트라벨 시 이 값만 교체 */
+    --accent-ink: #004b80;
+    --accent-wash:#eaf2f9;
+
+    --strong:     #0f7b56;   /* 강함 */
+    --normal:     #b07d10;   /* 보통 */
+    --weak:       #c03535;   /* 약함 */
+    --unrated:    #838a96;   /* 판정보류 */
+  }
+
+  @page { size: A4; margin: 18mm 16mm 20mm 16mm; }
+
+  * { box-sizing: border-box; }
+
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  body {
+    margin: 0;
+    font-family: "Pretendard", "Noto Sans CJK KR", "Apple SD Gothic Neo", sans-serif;
+    font-size: 9.6pt;
+    line-height: 1.62;
+    color: var(--ink);
+    background: var(--paper);
+  }
+
+  h1, h2, h3, h4 { margin: 0; font-weight: 700; letter-spacing: -0.01em; }
+
+  a { color: var(--accent-ink); text-decoration: none; word-break: break-all; }
+
+  /* ── 표지 ───────────────────────────────────────────────── */
+  .cover { height: 253mm; display: flex; flex-direction: column; page-break-after: always; }
+
+  .cover-kicker {
+    font-size: 8pt; font-weight: 700; letter-spacing: .16em;
+    color: var(--accent); text-transform: uppercase;
+  }
+  .cover-title { margin-top: 6mm; font-size: 25pt; line-height: 1.28; letter-spacing: -0.02em; }
+  .cover-title .target { display: block; }
+  .cover-sub { margin-top: 4mm; font-size: 10.5pt; color: var(--ink-soft); }
+
+  .score-block {
+    margin-top: 12mm; padding: 8mm 9mm;
+    background: var(--wash); border: 1px solid var(--line);
+    border-radius: 3mm; display: flex; align-items: center; gap: 9mm;
+  }
+  .score-figure { text-align: center; flex: 0 0 auto; }
+  .score-num { font-size: 46pt; font-weight: 800; line-height: 1; letter-spacing: -0.04em; color: var(--accent); }
+  .score-num small { font-size: 15pt; font-weight: 600; color: var(--ink-mute); }
+  .score-grade {
+    margin-top: 2.5mm; display: inline-block; padding: 1mm 3.5mm;
+    background: var(--accent); color: #fff; border-radius: 1.5mm;
+    font-size: 9pt; font-weight: 700; letter-spacing: .04em;
+  }
+  .score-body { flex: 1 1 auto; }
+  .score-verdict { font-size: 11.5pt; font-weight: 700; line-height: 1.5; }
+  .score-scale { margin-top: 5mm; }
+  .scale-bar { height: 5mm; border-radius: 2.5mm; background: #dfe3e9; position: relative; overflow: hidden; }
+  .scale-fill { position: absolute; inset: 0 auto 0 0; background: var(--accent); border-radius: 2.5mm; }
+  .scale-ticks { display: flex; justify-content: space-between; margin-top: 1.5mm; font-size: 7pt; color: var(--ink-mute); }
+
+  .meta-grid {
+    margin-top: 10mm; display: grid; grid-template-columns: repeat(2, 1fr);
+    gap: 0; border-top: 1px solid var(--line);
+  }
+  .meta-item { padding: 3.5mm 0; border-bottom: 1px solid var(--line-soft); }
+  .meta-item:nth-child(odd) { padding-right: 6mm; }
+  .meta-k { font-size: 7.5pt; font-weight: 700; letter-spacing: .1em; color: var(--ink-mute); }
+  .meta-v { margin-top: 1mm; font-size: 9.5pt; }
+
+  .cover-foot { margin-top: auto; }
+  .notice {
+    padding: 5mm 6mm; border: 1px solid var(--line); border-left: 2.5mm solid var(--accent);
+    border-radius: 0 2mm 2mm 0; background: var(--wash);
+    font-size: 8.2pt; line-height: 1.65; color: var(--ink-soft);
+  }
+  .notice b { color: var(--ink); }
+
+  /* ── 섹션 ───────────────────────────────────────────────── */
+  section { page-break-inside: auto; }
+  .sec { margin-top: 9mm; }
+  .sec:first-of-type { margin-top: 0; }
+
+  .sec-head {
+    display: flex; align-items: baseline; gap: 3mm;
+    padding-bottom: 2mm; margin-bottom: 4mm;
+    border-bottom: 1.2px solid var(--ink);
+    page-break-after: avoid;
+  }
+  .sec-no { font-size: 8pt; font-weight: 800; color: var(--accent); letter-spacing: .08em; }
+  .sec-title { font-size: 13pt; letter-spacing: -0.02em; }
+  .sec-note { margin-left: auto; font-size: 7.5pt; color: var(--ink-mute); }
+
+  .lead { font-size: 10pt; color: var(--ink-soft); margin-bottom: 4mm; }
+
+  /* 표 아래 해석 — 표만 던지지 않는다는 원칙의 구현 */
+  .read {
+    margin-top: 3mm; padding: 3mm 4mm; background: var(--accent-wash);
+    border-radius: 1.5mm; font-size: 8.6pt; line-height: 1.6; color: var(--accent-ink);
+  }
+  .read b { color: var(--accent-ink); }
+
+  /* ── 근거 라벨 ──────────────────────────────────────────── */
+  .lb {
+    display: inline-block; padding: 0.3mm 1.8mm; border-radius: 1mm;
+    font-size: 7pt; font-weight: 700; letter-spacing: .02em; white-space: nowrap;
+    vertical-align: 0.4mm;
+  }
+  .lb-ok   { background: var(--accent-wash); color: var(--accent-ink); border: 0.6px solid #b9d4e8; }
+  .lb-est  { background: #f0f1f4; color: var(--ink-soft);  border: 0.6px solid #d8dbe1; }
+  .lb-non  { background: #fff; color: var(--ink-mute); border: 0.8px dashed #c3c8d1; }
+
+  ul.facts { margin: 0; padding-left: 4.5mm; }
+  ul.facts li { margin-bottom: 2mm; page-break-inside: avoid; }
+  ul.facts li .src { font-size: 7.5pt; color: var(--ink-mute); }
+
+  /* ── 표 ─────────────────────────────────────────────────── */
+  table { width: 100%; border-collapse: collapse; font-size: 8.6pt; }
+  thead { display: table-header-group; }
+  th {
+    text-align: left; font-size: 7.5pt; font-weight: 700; letter-spacing: .06em;
+    color: var(--ink-mute); padding: 2.5mm 2mm; border-bottom: 1px solid var(--ink);
+    white-space: nowrap;
+  }
+  td { padding: 3mm 2mm; border-bottom: 1px solid var(--line-soft); vertical-align: top; line-height: 1.55; }
+  tr { page-break-inside: avoid; }
+  td.axis { font-weight: 700; width: 26mm; }
+  td.num { text-align: center; white-space: nowrap; }
+  .ev { display: block; margin-top: 1mm; font-size: 7.4pt; color: var(--ink-mute); }
+
+  .verdict { font-weight: 700; white-space: nowrap; font-size: 8.4pt; }
+  .v-strong  { color: var(--strong); }
+  .v-normal  { color: var(--normal); }
+  .v-weak    { color: var(--weak); }
+  .v-unrated { color: var(--unrated); }
+
+  .flag {
+    display: inline-block; padding: 0.3mm 1.6mm; border-radius: 1mm;
+    background: #fdf0f0; color: var(--weak); border: 0.6px solid #f2cfcf;
+    font-size: 7pt; font-weight: 700; white-space: nowrap;
+  }
+  .flag.none { background: #eff7f3; color: var(--strong); border-color: #cfe6db; }
+  .prio { letter-spacing: .5px; color: var(--weak); font-size: 8.5pt; }
+  .prio .off { color: #d5d8de; }
+
+  /* ── 불일치 카드 ────────────────────────────────────────── */
+  .gap { padding: 4mm 0; border-bottom: 1px solid var(--line-soft); page-break-inside: avoid; }
+  .gap-ch { font-size: 7.5pt; font-weight: 700; letter-spacing: .1em; color: var(--accent); }
+  .gap-body { margin-top: 1.5mm; }
+  .gap-vs { margin-top: 2mm; font-size: 8.2pt; color: var(--ink-soft); }
+  .gap-vs code {
+    font-family: inherit; background: var(--wash); padding: 0.4mm 1.5mm;
+    border-radius: 1mm; border: 0.6px solid var(--line);
+  }
+
+  /* ── 우선 수정 3가지 ────────────────────────────────────── */
+  .fix { margin-bottom: 5mm; padding: 5mm 6mm; border: 1px solid var(--line); border-radius: 2mm; page-break-inside: avoid; }
+  .fix-head { display: flex; align-items: baseline; gap: 3mm; }
+  .fix-rank {
+    flex: 0 0 auto; width: 6mm; height: 6mm; border-radius: 50%;
+    background: var(--accent); color: #fff; font-size: 8.5pt; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .fix-title { font-size: 10.5pt; font-weight: 700; }
+  .fix-rows { margin-top: 3mm; display: grid; grid-template-columns: 18mm 1fr; gap: 2mm 3mm; font-size: 8.8pt; }
+  .fix-k { font-size: 7.5pt; font-weight: 700; letter-spacing: .06em; color: var(--ink-mute); padding-top: 0.6mm; }
+
+  /* ── 복붙 문안 ──────────────────────────────────────────── */
+  .copy { margin-bottom: 5mm; page-break-inside: avoid; }
+  .copy-head { display: flex; align-items: baseline; gap: 2.5mm; margin-bottom: 2mm; }
+  .copy-ch { font-size: 8.5pt; font-weight: 700; }
+  .copy-limit { font-size: 7.2pt; color: var(--ink-mute); }
+  .copy-box {
+    padding: 4.5mm 5mm; background: var(--wash); border: 1px solid var(--line);
+    border-radius: 2mm; font-size: 9.2pt; line-height: 1.7; white-space: pre-wrap;
+  }
+  .copy-box.hero { background: var(--accent-wash); border-color: #b9d4e8; font-size: 10.5pt; font-weight: 600; line-height: 1.65; }
+  .ph { background: #fff6d9; border-bottom: 1px dashed #d9b53a; padding: 0 0.8mm; font-size: 8.8pt; }
+
+  /* ── FAQ ────────────────────────────────────────────────── */
+  .faq { padding: 3.5mm 0; border-bottom: 1px solid var(--line-soft); page-break-inside: avoid; }
+  .faq-q { font-weight: 700; }
+  .faq-q::before { content: "Q. "; color: var(--accent); }
+  .faq-a { margin-top: 1.5mm; color: var(--ink-soft); }
+  .faq-a::before { content: "A. "; font-weight: 700; color: var(--ink-mute); }
+
+  /* ── 질문/키워드 칩 ─────────────────────────────────────── */
+  .chips { display: flex; flex-wrap: wrap; gap: 1.8mm; }
+  .chip {
+    padding: 1.2mm 3mm; background: var(--wash); border: 1px solid var(--line);
+    border-radius: 6mm; font-size: 8.4pt;
+  }
+  .kw-tier { margin-bottom: 3.5mm; page-break-inside: avoid; }
+  .kw-tier-name { font-size: 7.5pt; font-weight: 700; letter-spacing: .08em; color: var(--ink-mute); margin-bottom: 1.5mm; }
+
+  /* ── 7일 계획 ───────────────────────────────────────────── */
+  .day { display: grid; grid-template-columns: 16mm 1fr 22mm; gap: 4mm; padding: 3.5mm 0; border-bottom: 1px solid var(--line-soft); page-break-inside: avoid; }
+  .day-n { font-size: 7.5pt; font-weight: 800; letter-spacing: .08em; color: var(--accent); padding-top: 0.8mm; }
+  .day-t { font-weight: 700; }
+  .day-d { margin-top: 1mm; font-size: 8.6pt; color: var(--ink-soft); }
+  .day-check { font-size: 7.5pt; color: var(--ink-mute); text-align: right; padding-top: 0.8mm; }
+  .day-check::before { content: "☐ "; font-size: 10pt; color: var(--line); }
+
+  /* ── 재점검 ─────────────────────────────────────────────── */
+  .recheck td.pass { font-weight: 700; color: var(--accent-ink); }
+
+  /* ── 부록 ───────────────────────────────────────────────── */
+  .appendix { page-break-before: always; }
+  .app-head { font-size: 11pt; font-weight: 700; margin-bottom: 3mm; padding-bottom: 1.5mm; border-bottom: 1px solid var(--line); }
+  ul.limits, ul.sources { margin: 0 0 6mm; padding-left: 4.5mm; font-size: 8.8pt; }
+  ul.limits li, ul.sources li { margin-bottom: 1.8mm; }
+  .sources .grade {
+    display: inline-block; min-width: 4mm; text-align: center; margin-right: 1.5mm;
+    font-size: 7pt; font-weight: 800; color: #fff; background: var(--ink-mute);
+    border-radius: 0.8mm; padding: 0.2mm 1mm;
+  }
+  .grade.g-S { background: var(--accent); }
+  .grade.g-A { background: #3d7fae; }
+  .grade.g-B { background: #6f7d8c; }
+
+  .colophon {
+    margin-top: 8mm; padding-top: 4mm; border-top: 1px solid var(--line);
+    font-size: 7.6pt; line-height: 1.65; color: var(--ink-mute);
+  }
+</style>
+</head>
+<body>
+
+<!-- 표지 -->
+<div class="cover">
+  <div class="cover-kicker">AI 추천도 진단 리포트</div>
+  <h1 class="cover-title"><span class="target" id="c-target"></span><span id="c-suffix"></span></h1>
+  <div class="cover-sub" id="c-sub"></div>
+
+  <div class="score-block">
+    <div class="score-figure">
+      <div class="score-num"><span id="c-score"></span><small>/100</small></div>
+      <div class="score-grade" id="c-grade"></div>
+    </div>
+    <div class="score-body">
+      <div class="score-verdict" id="c-verdict"></div>
+      <div class="score-scale">
+        <div class="scale-bar"><div class="scale-fill" id="c-fill"></div></div>
+        <div class="scale-ticks"><span>E 0</span><span>D 35</span><span>C 50</span><span>B 65</span><span>A 80</span><span>100</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="meta-grid" id="c-meta"></div>
+
+  <div class="cover-foot">
+    <div class="notice" id="c-notice"></div>
+  </div>
+</div>
+
+<!-- 본문 -->
+<main id="body"></main>
+
+<script id="report-data" type="application/json">/*__DATA__*/</script>
+<script>
+(function () {
+  const data = JSON.parse(document.getElementById('report-data').textContent);
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+  /* 플레이스홀더 [ ... ] 는 노란 표식으로 — 지어내지 않고 비워둔 자리임을 눈으로 구분 */
+  const ph = (s) => esc(s).replace(/\[([^\]]+)\]/g, '<span class="ph">[$1]</span>');
+
+  /* 본문은 전부 이스케이프하되 강조 <b>만 화이트리스트로 되살린다.
+     생성 결과를 그대로 innerHTML에 넣지 않기 위한 최소 장치다. */
+  const rich = (s) => ph(s).replace(/&lt;(\/?)b&gt;/g, '<$1b>');
+
+  const LB = { confirmed: ['lb-ok', '확인됨'], estimated: ['lb-est', '추정'], unverified: ['lb-non', '미확인'] };
+  const label = (k) => { const [c, t] = LB[k] || LB.unverified; return `<span class="lb ${c}">${t}</span>`; };
+
+  const VD = { strong: ['v-strong', '강함'], normal: ['v-normal', '보통'], weak: ['v-weak', '약함'], unrated: ['v-unrated', '판정보류'] };
+  const verdict = (k) => { const [c, t] = VD[k] || VD.unrated; return `<span class="verdict ${c}">${t}</span>`; };
+
+  const stars = (n) => `<span class="prio">${'★'.repeat(n)}<span class="off">${'☆'.repeat(5 - n)}</span></span>`;
+
+  const src = (e) => e.url
+    ? `<a href="${esc(e.url)}">${esc(e.label || e.url)}</a>`
+    : esc(e.label || '');
+
+  /* ── 표지 ── */
+  const m = data.meta;
+  $('c-target').textContent = m.targetName;
+  $('c-suffix').textContent = 'AI 추천도 진단';
+  $('c-sub').textContent = [m.targetTypeLabel, m.region, m.industry].filter(Boolean).join(' · ');
+  $('c-score').textContent = data.score.total;
+  $('c-grade').textContent = `${data.score.grade}등급 — ${data.score.gradeLabel}`;
+  $('c-verdict').textContent = data.oneLineVerdict;
+  $('c-fill').style.width = `${data.score.total}%`;
+
+  $('c-meta').innerHTML = [
+    ['진단일', m.diagnosedAt],
+    ['대상 유형', m.targetTypeLabel],
+    ['자료 밀도', `${m.coverage}/100 — ${m.coverageNote}`],
+    ['판정보류 축', m.unratedNote],
+    ['측정 엔진', m.engines],
+    ['루브릭 버전', m.engineVersion],
+  ].map(([k, v]) => `<div class="meta-item"><div class="meta-k">${esc(k)}</div><div class="meta-v">${esc(v)}</div></div>`).join('');
+
+  $('c-notice').innerHTML = data.notice;
+
+  /* ── 섹션 골격 ── */
+  const sec = (no, title, note, inner) => `
+    <section class="sec">
+      <div class="sec-head">
+        <span class="sec-no">${esc(no)}</span>
+        <h2 class="sec-title">${esc(title)}</h2>
+        ${note ? `<span class="sec-note">${esc(note)}</span>` : ''}
+      </div>
+      ${inner}
+    </section>`;
+
+  const read = (t) => t ? `<div class="read">${rich(t)}</div>` : '';
+
+  const out = [];
+
+  /* 1. 정체성 */
+  out.push(sec('01', 'AI가 현재 이해하는 정체성', '확인됨 / 추정 / 미확인 구분',
+    `<ul class="facts">${data.identity.map((f) => `
+      <li>${label(f.label)} ${ph(f.text)}
+        ${f.sources?.length ? `<span class="src">— ${f.sources.map(src).join(' · ')}</span>` : ''}</li>`).join('')}</ul>
+     ${read(data.identityRead)}`));
+
+  /* 2. 한 문장 진단 */
+  out.push(sec('02', '한 문장 진단', null,
+    `<div class="copy-box hero">${ph(data.oneLineVerdict)}</div>${read(data.oneLineRead)}`));
+
+  /* 3. 7축 진단표 */
+  out.push(sec('03', '항목별 진단표', '가중치 합 100', `
+    <table>
+      <thead><tr>
+        <th>항목</th><th>현재 상태</th><th class="num">문제 유형</th><th class="num">판정</th><th class="num">시급도</th>
+      </tr></thead>
+      <tbody>${data.axes.map((a) => `
+        <tr>
+          <td class="axis">${esc(a.name)}<span class="ev">가중치 ${a.weight}</span></td>
+          <td>${ph(a.state)}${a.evidence?.length ? `<span class="ev">근거: ${a.evidence.map(src).join(' · ')}</span>` : ''}</td>
+          <td class="num"><span class="flag ${a.flag === '문제 없음' ? 'none' : ''}">${esc(a.flag)}</span></td>
+          <td class="num">${verdict(a.verdict)}</td>
+          <td class="num">${stars(a.priority)}</td>
+        </tr>`).join('')}</tbody>
+    </table>
+    ${read(data.axesRead)}`));
+
+  /* 4. 채널 불일치 */
+  out.push(sec('04', '채널별 정보 불일치', null,
+    data.gaps.map((g) => `
+      <div class="gap">
+        <div class="gap-ch">${esc(g.channel)}</div>
+        <div class="gap-body">${ph(g.issue)}</div>
+        <div class="gap-vs">현재 <code>${ph(g.current)}</code> → 있어야 할 상태 <code>${ph(g.expected)}</code></div>
+      </div>`).join('') + read(data.gapsRead)));
+
+  /* 5. 추천되기 어려운 이유 */
+  out.push(sec('05', '추천되기 어려운 이유', null,
+    `<ul class="facts">${data.reasons.map((r) => `<li>${ph(r)}</li>`).join('')}</ul>`));
+
+  /* 6. 먼저 고칠 3가지 */
+  out.push(sec('06', '가장 먼저 고칠 문제 3가지', '이 순서대로 손댄다',
+    data.fixes.map((f, i) => `
+      <div class="fix">
+        <div class="fix-head"><div class="fix-rank">${i + 1}</div><div class="fix-title">${esc(f.title)}</div></div>
+        <div class="fix-rows">
+          <div class="fix-k">무엇을</div><div>${ph(f.what)}</div>
+          <div class="fix-k">어디서</div><div>${ph(f.where)}</div>
+          <div class="fix-k">왜 먼저</div><div>${ph(f.why)}</div>
+        </div>
+      </div>`).join('')));
+
+  /* 7~8. 복붙 문안 */
+  out.push(sec('07', '개선된 한 줄 소개', '누구 · 무엇을 · 누구를 위해 · 어떤 강점으로',
+    `<div class="copy-box hero">${ph(data.oneLiner)}</div>${read(data.oneLinerRead)}`));
+
+  out.push(sec('08', '채널별 소개문', '그대로 복사해 붙여넣는다',
+    data.channelCopy.map((c) => `
+      <div class="copy">
+        <div class="copy-head">
+          <span class="copy-ch">${esc(c.channel)}</span>
+          <span class="copy-limit">${esc(c.limit)} · ${c.text.length}자</span>
+        </div>
+        <div class="copy-box">${ph(c.text)}</div>
+      </div>`).join('')));
+
+  /* 9. FAQ */
+  out.push(sec('09', 'FAQ', '공식 채널에 그대로 싣는다',
+    data.faq.map((f) => `
+      <div class="faq"><div class="faq-q">${ph(f.q)}</div><div class="faq-a">${ph(f.a)}</div></div>`).join('')
+    + read(data.faqRead)));
+
+  /* 10. 추천 질문 + 키워드 */
+  out.push(sec('10', 'AI가 추천할 수 있는 질문', '이 문장들이 실제 검색어다',
+    `<div class="chips">${data.questions.map((q) => `<span class="chip">${esc(q)}</span>`).join('')}</div>
+     <div style="height:5mm"></div>
+     ${data.keywords.map((t) => `
+       <div class="kw-tier">
+         <div class="kw-tier-name">${esc(t.tier)}</div>
+         <div class="chips">${t.terms.map((k) => `<span class="chip">${esc(k)}</span>`).join('')}</div>
+       </div>`).join('')}
+     ${read(data.questionsRead)}`));
+
+  /* 11. 7일 계획 */
+  out.push(sec('11', '7일 실행 계획', '하루 한 칸씩 체크',
+    data.plan7.map((d) => `
+      <div class="day">
+        <div class="day-n">DAY ${d.day}</div>
+        <div><div class="day-t">${esc(d.title)}</div><div class="day-d">${ph(d.detail)}</div></div>
+        <div class="day-check">완료</div>
+      </div>`).join('')));
+
+  /* 12. 재점검 */
+  out.push(sec('12', '30일 뒤 재점검 체크리스트', '통과 기준이 있어야 점검이 된다', `
+    <table class="recheck">
+      <thead><tr><th>점검 항목</th><th>확인 방법</th><th>통과 기준</th></tr></thead>
+      <tbody>${data.recheck.map((r) => `
+        <tr><td>${ph(r.item)}</td><td>${esc(r.how)}</td><td class="pass">${esc(r.pass)}</td></tr>`).join('')}</tbody>
+    </table>
+    ${read(data.recheckRead)}`));
+
+  /* 부록 */
+  out.push(`
+    <div class="appendix">
+      <div class="app-head">부록 A. 이번 진단의 한계</div>
+      <ul class="limits">${data.limits.map((l) => `<li>${ph(l)}</li>`).join('')}</ul>
+
+      <div class="app-head">부록 B. 근거로 사용한 출처</div>
+      <ul class="sources">${data.sources.map((s) => `
+        <li><span class="grade g-${esc(s.grade)}">${esc(s.grade)}</span>${esc(s.name)}
+          ${s.url ? `— <a href="${esc(s.url)}">${esc(s.url)}</a>` : ''}
+          ${s.checkedAt ? `<span class="ev">확인 ${esc(s.checkedAt)}</span>` : ''}</li>`).join('')}</ul>
+
+      <div class="app-head">부록 C. 측정에 사용한 질문 세트</div>
+      <table>
+        <thead><tr><th>#</th><th>질문</th><th>범주</th><th class="num">호명</th><th class="num">인용된 출처</th></tr></thead>
+        <tbody>${data.probes.map((p, i) => `
+          <tr><td class="num">${i + 1}</td><td>${esc(p.q)}</td><td>${esc(p.category)}</td>
+              <td class="num">${esc(p.mentioned)}</td><td class="num">${esc(p.cited)}</td></tr>`).join('')}</tbody>
+      </table>
+      <div class="read">${rich(data.probesRead)}</div>
+
+      <div class="colophon">${data.colophon}</div>
+    </div>`);
+
+  $('body').innerHTML = out.join('');
+})();
+</script>
+</body>
+</html>
