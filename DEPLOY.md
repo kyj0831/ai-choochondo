@@ -1,115 +1,124 @@
-# Railway 배포 가이드
+# 배포 가이드 — 웹사이트로 올리기
 
-이 앱을 웹에 올려 URL로 접속할 수 있게 만드는 방법입니다.
-Railway는 이 앱처럼 "Node 서버 + SQLite 파일" 구조를 그대로 올릴 수 있는 호스트입니다.
+이 앱을 인터넷에 올려 **URL로 접속하는 웹사이트**로 만드는 방법입니다.
+배포하면 `https://...` 주소가 생기고, 그 주소를 아는 사람은 브라우저에서 바로 씁니다.
 
-> 준비물: Railway 계정(https://railway.app, GitHub/구글로 가입), 그리고 이 폴더에서 터미널.
-> 비용: 사용량 기반, 보통 소규모는 월 $5 안팎. 신규 계정은 무료 크레딧이 있습니다.
+이 앱은 **Node 서버 + SQLite 파일 + PDF 렌더링(Chromium)** 구조라,
+Vercel·Netlify 같은 서버리스보다 **"컨테이너 + 영구 볼륨"**을 주는 호스트가 맞습니다.
+아래 세 방법 중 하나를 고르세요.
+
+| 방법 | 언제 | 난이도 |
+|---|---|---|
+| **A. Railway + GitHub** | 코드가 이미 GitHub에 있음. 푸시하면 자동 재배포 | ★ 가장 쉬움 |
+| **B. Railway CLI** | GitHub 없이 로컬에서 바로 올릴 때 | ★★ |
+| **C. Docker (Render / Fly.io 등)** | 다른 호스트를 쓰거나 이미지로 배포할 때 | ★★ |
+
+> 비용: 소규모 기준 월 $5 안팎 + AI API 사용량 별도. 신규 계정은 대개 무료 크레딧이 있습니다.
+> 빌드는 검증됨: `npm ci && npm run build`가 깨끗하게 통과합니다(Node 22 기준).
 
 ---
 
-## A. 가장 간단한 방법 — Railway CLI (GitHub 불필요)
+## 공통 — 반드시 설정할 환경변수
 
-### 1. Railway CLI 설치 + 로그인
+어느 방법이든 아래 값을 호스트의 **Variables(환경변수)**에 넣습니다. 코드에는 넣지 마세요.
+
+| 변수 | 필수 | 설명 |
+|---|---|---|
+| `OPENAI_API_KEY` **또는** `ANTHROPIC_API_KEY` | 사실상 필수 | 둘 중 **하나만**. 없으면 "데모 모드"(샘플)로만 동작 |
+| `DATA_DIR` | 필수 | SQLite 저장 경로. 볼륨 마운트 경로와 동일하게 `/data` |
+| `APP_PASSWORD` | **강력 권장** | 접근 비밀번호. 없으면 URL 아는 누구나 모든 진단 데이터 열람 |
+| `AUTH_SECRET` | 권장 | 세션 서명용 랜덤 문자열. `openssl rand -hex 16`로 생성 |
+
+> AI 프로필 허브(`/p/*`), `robots.txt`, `sitemap.xml`, `llms.txt`는 비밀번호와 무관하게
+> **항상 공개**입니다. AI 크롤러가 읽어가는 것이 그 페이지의 목적이기 때문입니다.
+
+---
+
+## A. Railway + GitHub (권장)
+
+이 저장소는 이미 GitHub(`kyj0831/ai-choochondo`)에 있고, `nixpacks.toml`/`railway.json`로
+빌드 설정이 들어 있어 별도 설정 없이 바로 배포됩니다.
+
+1. https://railway.app 가입(GitHub 계정으로).
+2. **New Project → Deploy from GitHub repo → `kyj0831/ai-choochondo`** 선택.
+   - 배포 브랜치는 `main`.
+3. 서비스 → **Variables** 탭에서 위 [공통 환경변수](#공통--반드시-설정할-환경변수)를 입력.
+4. 서비스 → **Settings → Volumes → New Volume**, Mount path `/data`
+   (환경변수 `DATA_DIR`과 동일하게). 볼륨을 붙이면 자동 재배포됩니다.
+5. **Settings → Networking → Generate Domain**으로 공개 URL 생성
+   (예: `ai-choochondo.up.railway.app`). 이 URL을 공유하면 끝.
+
+이후에는 `main`에 커밋을 푸시할 때마다 자동으로 다시 배포됩니다.
+
+---
+
+## B. Railway CLI (GitHub 없이)
 
 ```bash
 npm install -g @railway/cli
-railway login          # 브라우저가 열리며 로그인
-```
+railway login            # 브라우저 로그인
 
-### 2. 이 폴더에서 프로젝트 생성
+# 이 프로젝트 폴더에서
+railway init             # 프로젝트 이름 입력 (예: ai-choochondo)
 
-```bash
-cd "/Users/gge/Documents/Claude/Projects/AI 추천도 진단"
-railway init           # 프로젝트 이름 입력 (예: ai-choochondo)
-```
-
-### 3. 환경변수(비밀 키) 설정
-
-API 키는 코드에 넣지 않고 여기서 넣습니다. **OpenAI든 Anthropic이든 하나만** 넣으면 됩니다.
-
-```bash
-railway variables --set "OPENAI_API_KEY=sk-여기에_본인_키"
-# 또는
-railway variables --set "ANTHROPIC_API_KEY=sk-ant-여기에_본인_키"
-
-# SQLite 파일을 영구 볼륨에 저장하도록 경로 지정 (아래 5단계 볼륨과 짝)
+# 환경변수 (위 표 참고 — 키는 OpenAI/Anthropic 중 하나만)
+railway variables --set "OPENAI_API_KEY=sk-본인_키"
 railway variables --set "DATA_DIR=/data"
-
-# 접근 제한 — 반드시 설정하세요.
-# 없으면 URL을 아는 누구나 모든 진단 데이터를 볼 수 있습니다.
 railway variables --set "APP_PASSWORD=원하는_비밀번호"
 railway variables --set "AUTH_SECRET=$(openssl rand -hex 16)"
+
+railway up               # 빌드 + 배포
+railway domain           # 공개 URL 생성/확인
 ```
 
-> AI 프로필 허브(`/p/*`)와 `robots.txt` / `sitemap.xml`은 비밀번호와 무관하게
-> **항상 공개**입니다. AI 크롤러가 읽어가는 것이 그 페이지의 목적이기 때문입니다.
-
-> 키를 아직 안 넣으면 배포는 되지만 "데모 모드"로 동작합니다(실제 AI 분석 없이 샘플).
-
-### 4. 배포
-
-```bash
-railway up
-```
-
-빌드가 끝나면 배포 URL이 생성됩니다. 없으면 아래로 공개 도메인을 켭니다:
-
-```bash
-railway domain          # 공개 URL 생성/확인 (예: ai-choochondo.up.railway.app)
-```
-
-### 5. 영구 디스크(볼륨) 연결 — **꼭 해야 데이터가 안 사라집니다**
-
-Railway 대시보드(https://railway.app) → 방금 만든 프로젝트 → 서비스 클릭 →
-**Settings → Volumes → New Volume** →
-- Mount path: `/data`  (3단계에서 넣은 `DATA_DIR` 값과 동일하게)
-
-볼륨을 붙이면 자동으로 재배포됩니다. 이제 재시작·재배포해도 진단 데이터가 유지됩니다.
+그다음 **대시보드 → Settings → Volumes**에서 Mount path `/data` 볼륨을 붙입니다
+(A의 4번과 동일). **볼륨을 안 붙이면 재배포 때 데이터가 사라집니다.**
 
 ---
 
-## B. GitHub 연동 방법 (코드 수정할 때마다 자동 재배포)
+## C. Docker (Render / Fly.io / Cloud Run / VPS)
 
-나중에 코드를 자주 고칠 계획이면 이 방식이 편합니다.
+저장소 루트의 [`Dockerfile`](Dockerfile)이 chromium·한글 폰트·better-sqlite3 빌드까지
+포함한 이미지를 만듭니다. 도커 이미지를 받는 호스트라면 어디서든 동일하게 배포됩니다.
 
-1. GitHub에 비공개 저장소를 만들고 이 폴더를 올립니다:
-   ```bash
-   cd "/Users/gge/Documents/Claude/Projects/AI 추천도 진단"
-   git init && git add -A && git commit -m "first"
-   git branch -M main
-   git remote add origin https://github.com/본인계정/저장소이름.git
-   git push -u origin main
-   ```
-   (`.env.local`과 SQLite 파일은 `.gitignore`에 있어 **업로드되지 않습니다** — 안전)
-2. Railway 대시보드 → **New Project → Deploy from GitHub repo** → 저장소 선택
-3. 위 A의 3·5단계(환경변수, 볼륨)를 대시보드 **Variables / Volumes** 탭에서 동일하게 설정
+로컬에서 직접 실행해보려면:
+
+```bash
+docker build -t ai-choochondo .
+docker run -p 3000:3000 \
+  -e OPENAI_API_KEY=sk-본인_키 \
+  -e APP_PASSWORD=원하는_비밀번호 \
+  -e AUTH_SECRET=$(openssl rand -hex 16) \
+  -v ai-choochondo-data:/data \
+  ai-choochondo
+# http://localhost:3000
+```
+
+- **Render**: New → Web Service → 저장소 연결 → Environment=Docker → 위 환경변수 입력 →
+  Disks에서 마운트 경로 `/data` 디스크 추가.
+- **Fly.io**: `fly launch`(Dockerfile 자동 감지) → `fly volumes create data` →
+  `fly.toml`의 `[mounts]`로 `/data` 연결 → `fly secrets set`으로 환경변수 주입.
+
+`-v .../:/data` 볼륨은 여기서도 필수입니다.
 
 ---
 
-## ⚠️ 배포 후 꼭 확인 / 다음 단계
+## ⚠️ 배포 후 꼭 확인
 
-1. **비밀번호 게이트가 켜졌는지 확인하세요.**
-   `APP_PASSWORD`를 설정하지 않으면 게이트가 꺼진 채 배포되어, URL을 아는 사람은
-   누구나 모든 진단 데이터를 볼 수 있습니다. 배포 후 시크릿 창으로 접속해
-   로그인 화면이 뜨는지 직접 확인하세요.
-
+1. **비밀번호 게이트 확인.** 시크릿 창으로 접속해 로그인 화면이 뜨는지 직접 보세요.
+   `APP_PASSWORD`를 안 넣으면 게이트가 꺼진 채 배포되어 데이터가 공개됩니다.
    반대로 허브 페이지(`/p/슬러그`)는 로그인 없이 열려야 정상입니다.
-   여기가 막히면 AI 크롤러가 읽지 못해 허브 기능 전체가 무의미해집니다.
-
-2. **비용 모니터링**: Railway 대시보드에서 사용량/요금을 확인하세요. AI 키를 실제로 쓰면
-   OpenAI/Anthropic 쪽에서도 사용량만큼 별도 과금됩니다.
-
-3. **데이터 백업**: 진단 데이터는 볼륨의 `app.sqlite` 파일 하나에 들어있습니다.
-   중요해지면 주기적으로 내려받아 백업하세요.
+2. **데모 모드 배너가 계속 뜨면** `OPENAI_API_KEY`/`ANTHROPIC_API_KEY`가 비어 있는 것.
+3. **비용 모니터링.** 호스트 요금 + OpenAI/Anthropic API 사용량이 별도로 과금됩니다.
+4. **데이터 백업.** 진단 데이터는 볼륨의 `app.sqlite` 파일 하나. 중요해지면 주기적으로 백업.
 
 ---
 
 ## 문제 해결
 
-- **배포는 됐는데 데이터가 자꾸 사라짐** → 볼륨(5단계)을 안 붙였거나 `DATA_DIR`과 마운트
-  경로가 다릅니다. 둘 다 `/data`로 맞추세요.
-- **"데모 모드" 배너가 계속 뜸** → `OPENAI_API_KEY` 또는 `ANTHROPIC_API_KEY` 환경변수가
-  비어 있습니다. 대시보드 Variables에서 확인 후 재배포하세요.
-- **빌드 실패(better-sqlite3 관련)** → 대부분 자동 해결됩니다. 반복되면 Railway 로그를
-  Claude에게 보여주세요.
+- **데이터가 자꾸 사라짐** → 볼륨을 안 붙였거나 `DATA_DIR`과 마운트 경로가 다름. 둘 다 `/data`로.
+- **PDF의 한글이 □로 나옴** → 이미지에 `fonts-noto-cjk`가 없음(Dockerfile·nixpacks.toml엔 포함됨).
+- **PDF 생성 실패(chromium)** → `PUPPETEER_EXECUTABLE_PATH`가 실제 chromium 경로(`/usr/bin/chromium`)를
+  가리키는지 확인.
+- **빌드 실패(better-sqlite3)** → 네이티브 빌드용 `python3/make/g++`가 필요(Dockerfile에 포함).
+  Railway는 자동 처리됩니다. 반복되면 배포 로그를 Claude에게 보여주세요.

@@ -1,0 +1,12 @@
+{
+  "name": "ai-discoverability-report-template",
+  "private": true,
+  "type": "module",
+  "description": "AI 추천도 진단 리포트 — A4 PDF 결과지 템플릿 프로토타입",
+  "scripts": {
+    "render": "node render.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.49.0"
+  }
+}
