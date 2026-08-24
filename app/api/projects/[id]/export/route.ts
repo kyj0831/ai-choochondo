@@ -120,18 +120,29 @@ function escapeHtml(s: string): string {
  *
  * 배포 이미지에는 apt로 설치한 시스템 chromium을 쓰는데, 배포판에 따라
  * 실행 파일 경로가 달라(chromium / chromium-browser 등) 한 곳으로 고정하면
- * 환경이 바뀔 때마다 깨진다. 후보를 순서대로 확인하고, 아무것도 없으면
- * undefined를 돌려줘 puppeteer 기본 동작(번들 브라우저)에 맡긴다.
+ * 환경이 바뀔 때마다 깨진다. 로컬(macOS/Windows)에서는 이미 설치돼 있는
+ * Chrome/Edge를 그대로 쓸 수 있게 데스크톱 경로도 후보에 넣는다.
+ * 후보를 순서대로 확인하고, 아무것도 없으면 undefined를 돌려줘
+ * puppeteer 기본 동작(직접 설치한 브라우저 캐시)에 맡긴다.
  */
 async function resolveChromium(): Promise<string | undefined> {
   const { access } = await import("fs/promises");
 
   const candidates = [
     process.env.PUPPETEER_EXECUTABLE_PATH,
+    // Linux (배포 이미지 / 대부분의 서버)
     "/usr/bin/chromium",
     "/usr/bin/chromium-browser",
     "/usr/bin/google-chrome-stable",
     "/usr/bin/google-chrome",
+    // macOS — 로컬에서 크롬/엣지가 깔려 있으면 그대로 사용
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+    // Windows
+    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+    "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
   ].filter((p): p is string => !!p);
 
   for (const path of candidates) {

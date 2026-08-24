@@ -124,6 +124,15 @@ export default function ReportPage({ params }: { params: { id: string } }) {
           >
             PDF 내려받기
           </a>
+          <a
+            href={`/api/projects/${params.id}/export?format=html&run=${report.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-secondary text-xs"
+            title="PDF 내려받기가 안 되면: 이 화면에서 브라우저 인쇄(Ctrl/⌘+P) → 대상을 'PDF로 저장'"
+          >
+            인쇄용 보기
+          </a>
           <button onClick={reanalyze} disabled={reanalyzing} className="btn-secondary text-xs">
             {reanalyzing ? "재분석 중..." : "동일 조건 재분석"}
           </button>
