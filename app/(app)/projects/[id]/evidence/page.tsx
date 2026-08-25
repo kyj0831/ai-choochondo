@@ -43,6 +43,7 @@ function QueryEvidenceCard({
   const [open, setOpen] = useState(false);
   const [engine, setEngine] = useState(ENGINES[0]);
   const [text, setText] = useState("");
+  const [links, setLinks] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [warn, setWarn] = useState("");
   const [copied, setCopied] = useState(false);
@@ -58,14 +59,26 @@ function QueryEvidenceCard({
     setSubmitting(true);
     setWarn("");
     try {
+      // ChatGPT·Perplexity·Gemini는 출처를 본문 URL이 아니라 별도 각주 칩으로
+      // 보여준다. "답변 전문 복사"만으로는 그 링크가 딸려오지 않아 근거 부록이
+      // 통째로 비게 되므로, 사용자가 따로 붙여넣은 링크를 판정 대상 텍스트
+      // 끝에 명시적으로 이어 붙인다. 판정(mock·실제 LLM 모두)이 URL을 텍스트에서
+      // 추출하는 방식이라 이렇게만 해도 그대로 인식된다.
+      const linkList = links
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean);
+      const fullText = linkList.length ? `${text}\n\n[출처 링크]\n${linkList.join("\n")}` : text;
+
       const res = await fetch(`/api/projects/${projectId}/evidence`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query_id: query.id, engine_label: engine, response_text: text, status }),
+        body: JSON.stringify({ query_id: query.id, engine_label: engine, response_text: fullText, status }),
       });
       const data = await res.json();
       if (data.warning) setWarn(data.warning);
       setText("");
+      setLinks("");
       setOpen(false);
       onChange();
     } finally {
@@ -119,7 +132,13 @@ function QueryEvidenceCard({
               아래 <span className="font-semibold text-slate-700">"질문 복사"</span> 버튼으로 이 질문을 복사
             </li>
             <li>ChatGPT·Perplexity 등 AI 서비스에 붙여넣고 직접 물어보기</li>
-            <li>거기서 받은 답변 전문을 복사해서 아래 입력창에 붙여넣고 제출</li>
+            <li>거기서 받은 답변 전문을 복사해서 아래 입력창에 붙여넣기</li>
+            <li>
+              <span className="font-semibold text-amber-700">출처 링크도 따로 챙기기</span> — Perplexity·Gemini는
+              출처를 본문 글자가 아니라 번호가 매겨진 각주로 따로 보여준다. 답변만 복사하면 이 링크가
+              빠져 "근거 부록"이 빈 채로 남는다. 각주를 눌러 나오는 링크를 우클릭 → 링크 주소 복사해서
+              아래 "출처 링크" 칸에 한 줄씩 붙여넣으면 리포트 근거에 반영된다
+            </li>
           </ol>
           <div className="flex gap-2">
             <select className="input w-40" value={engine} onChange={(e) => setEngine(e.target.value)}>
@@ -139,6 +158,17 @@ function QueryEvidenceCard({
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
+          <div>
+            <label className="text-xs font-medium text-slate-600 block mb-1">
+              출처 링크 <span className="font-normal text-slate-400">(있으면 한 줄에 하나씩 — 선택이지만 넣을수록 근거 부록·출처 신뢰도 점수가 정확해짐)</span>
+            </label>
+            <textarea
+              className="input min-h-[56px] text-xs"
+              placeholder={"https://...\nhttps://..."}
+              value={links}
+              onChange={(e) => setLinks(e.target.value)}
+            />
+          </div>
           <div className="flex gap-2">
             <button onClick={() => submit()} disabled={submitting || !text.trim()} className="btn-primary text-xs !px-4 !py-2">
               {submitting ? "판정 중..." : "제출 및 판정"}
@@ -255,7 +285,7 @@ export default function EvidencePage({ params }: { params: { id: string } }) {
       )}
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
       <p className="text-xs text-slate-400 mb-4">
-        각 질문 카드의 <span className="font-semibold">"+ 답변 추가"</span>를 눌러 펼친 뒤, 질문을 복사해 ChatGPT/Perplexity/Gemini 등에 직접 물어보고 받은 답변을 붙여넣어 제출하세요. 최소 1개 이상 제출하면 분석할 수 있지만, 신뢰도 배지를 위해 질문 8개 이상·엔진 2개 이상을 권장합니다.
+        각 질문 카드의 <span className="font-semibold">"+ 답변 추가"</span>를 눌러 펼친 뒤, 질문을 복사해 ChatGPT/Perplexity/Gemini 등에 직접 물어보고 받은 답변을 붙여넣어 제출하세요. 답변에 딸린 출처 각주가 있으면 링크도 따로 복사해 "출처 링크" 칸에 붙여넣으세요 — 안 넣으면 근거 부록과 출처 신뢰도 점수가 실제보다 낮게 나옵니다. 최소 1개 이상 제출하면 분석할 수 있지만, 신뢰도 배지를 위해 질문 8개 이상·엔진 2개 이상을 권장합니다.
       </p>
 
       <div className="flex gap-2 mb-4 flex-wrap">
