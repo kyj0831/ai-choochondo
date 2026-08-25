@@ -71,7 +71,7 @@ function sampleFor(
         description_accuracy: 0.85,
         conflicts: [],
         source_types: ["official_site", "official_sns"],
-        citations: ["https://example.com/official"],
+        citations: [],
         confidence: 0.8,
       },
     };
@@ -91,7 +91,7 @@ function sampleFor(
         description_accuracy: stale ? 0.6 : 0.85,
         conflicts: stale ? ["과거 정보로 보이는 표현이 있어 최신성 보강이 필요"] : [],
         source_types: ["official_site"],
-        citations: ["https://example.com/official"],
+        citations: [],
         confidence: 0.75,
       },
     };
@@ -110,7 +110,7 @@ function sampleFor(
         description_accuracy: 0.8,
         conflicts: [],
         source_types: ["official_site", "news_media"],
-        citations: ["https://example.com/official"],
+        citations: [],
         confidence: 0.78,
       },
     };

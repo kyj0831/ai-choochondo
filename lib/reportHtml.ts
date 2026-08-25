@@ -1,3 +1,4 @@
+import { isMockMode } from "./openai";
 import { EvidenceRow, Project, QueryRow, ReportJSON, ReportRow } from "./types";
 
 /**
@@ -74,6 +75,8 @@ export function buildReportHtml(input: ReportHtmlInput): string {
   });
 
   const queryById = new Map(queries.map((q) => [q.id, q]));
+  // 키가 없어 샘플 로직으로 만든 리포트인지. 표지에 경고를 띄우는 근거가 된다.
+  const isMock = isMockMode();
 
   return `<!DOCTYPE html>
 <html lang="ko"><head><meta charset="utf-8"><title>${esc(project.brand_name)} AI 추천도 리포트</title>
@@ -153,6 +156,11 @@ export function buildReportHtml(input: ReportHtmlInput): string {
 
   .pagebreak { page-break-before: always; }
   footer { margin-top: 26px; padding-top: 12px; border-top: 1px solid #e2e8f0; }
+  /* 데모(목업) 모드 경고. 실제 AI 판정이 아닌 결과가 고객에게 전달되는 사고를 막는다. */
+  .demo-warn { margin: 18px 0 0; padding: 12px 14px; border: 2px solid #dc2626;
+    border-radius: 6px; background: #fef2f2; color: #991b1b; }
+  .demo-warn b { font-size: 12pt; }
+  .demo-warn p { margin: 6px 0 0; font-size: 9pt; line-height: 1.6; color: #7f1d1d; }
 </style></head><body>
 
 <!-- 표지 -->
@@ -169,6 +177,17 @@ export function buildReportHtml(input: ReportHtmlInput): string {
       AI 추천이나 검색 순위를 보장하지 않습니다.
     </div>
   </div>
+  ${
+    isMock
+      ? `<div class="demo-warn">
+    <b>⚠ 데모(샘플) 리포트 — 실제 AI 진단 결과가 아닙니다</b>
+    <p>LLM API 키가 설정되지 않아 샘플 로직으로 생성된 문서입니다. 점수·판정·근거는 실제 측정값이
+    아니므로 고객에게 전달하거나 의사결정에 사용하지 마세요.<br>
+    실제 진단을 하려면 <code>.env.local</code>에 OPENAI_API_KEY 또는 ANTHROPIC_API_KEY를 넣고
+    서버를 다시 시작한 뒤 새로 진단하세요.</p>
+  </div>`
+      : ""
+  }
 </div>
 
 <!-- 요약 -->

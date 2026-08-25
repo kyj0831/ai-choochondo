@@ -365,10 +365,11 @@ function mockJudgment(input: JudgeEvidenceInput): EvidenceJudgment {
   const isRecommendish = /추천|후보|고려할 만한|좋습니다/.test(input.responseText);
   const mention: MentionType = !found ? "not_found" : isRecommendish ? "recommended_candidate" : "simple_mention";
 
-  // 인용은 응답에 실제로 있는 URL에서 뽑는다. 하드코딩하면 출처 신뢰도·인용 추적이
-  // 입력과 무관해져 판정 결과를 검증할 수 없다.
-  const urls = extractUrls(input.responseText);
-  const citations = urls.length > 0 ? urls : found ? ["https://example.com/official"] : [];
+  // 인용은 응답에 실제로 있는 URL에서만 뽑는다. 없으면 빈 배열이다.
+  // 예전에는 URL이 없을 때 example.com 자리표시자를 넣었는데, 그 가짜 주소가
+  // 리포트 근거 부록과 PDF에까지 그대로 실려 나갔다. 검증 불가능한 출처를
+  // 지어내느니 "출처 없음"이 정직하고, 출처 신뢰도 축도 그래야 실제로 움직인다.
+  const citations = extractUrls(input.responseText);
 
   return {
     entity_found: found,
