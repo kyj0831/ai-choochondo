@@ -365,10 +365,11 @@ function mockJudgment(input: JudgeEvidenceInput): EvidenceJudgment {
   const isRecommendish = /추천|후보|고려할 만한|좋습니다/.test(input.responseText);
   const mention: MentionType = !found ? "not_found" : isRecommendish ? "recommended_candidate" : "simple_mention";
 
-  // 인용은 응답에 실제로 있는 URL에서 뽑는다. 하드코딩하면 출처 신뢰도·인용 추적이
-  // 입력과 무관해져 판정 결과를 검증할 수 없다.
-  const urls = extractUrls(input.responseText);
-  const citations = urls.length > 0 ? urls : found ? ["https://example.com/official"] : [];
+  // 인용은 응답에 실제로 있는 URL에서만 뽑는다. 없으면 빈 배열이다.
+  // 예전에는 URL이 없을 때 example.com 자리표시자를 넣었는데, 그 가짜 주소가
+  // 리포트 근거 부록과 PDF에까지 그대로 실려 나갔다. 검증 불가능한 출처를
+  // 지어내느니 "출처 없음"이 정직하고, 출처 신뢰도 축도 그래야 실제로 움직인다.
+  const citations = extractUrls(input.responseText);
 
   return {
     entity_found: found,
@@ -411,6 +412,7 @@ export interface ReportNarrative {
     common_profile: string;
     faq: { q: string; a: string }[];
   };
+  recheck_checklist?: { item: string; how: string; pass_criteria: string }[];
   limitations: string[];
 }
 
@@ -422,7 +424,15 @@ export async function generateReportNarrative(input: GenerateReportInput): Promi
 "why_weak": string(추천에서 약한 구조적 이유 설명), "actions": [{"priority":1..5,"title":string,"channel":string,"rationale":string,"copy":string,"steps":string[]}] (정확히 5개, 우선순위 순.
 steps는 3~5개의 단계별 실행 가이드로, 마케팅 지식이 없는 고객사 담당자가 그대로 따라 할 수 있게 명령형 한 문장씩 작성하라 — 어디에 로그인/접속해서, 무엇을 열고, 어떤 문안을 어디에 붙여넣는지 수준으로 구체적으로),
 "copy_assets": {"one_sentence":string,"three_sentence":string,"meta_description":string,"common_profile":string,"faq":[{"q":string,"a":string}](4~6개)},
+"recheck_checklist": [{"item":string,"how":string,"pass_criteria":string}] (정확히 5개),
 "limitations": string[] (표본·수집 한계 고지 문구 2~4개)}
+
+## recheck_checklist 작성 규칙 (30일 뒤 스스로 점검하는 표)
+- item: 무엇을 점검하는가. 위 actions에서 실행한 개선이 실제로 먹혔는지 확인하는 항목으로 잡아라.
+- how: 어떻게 확인하는가. "ChatGPT에 '<구체적 질문>'을 입력한다"처럼 그대로 따라 할 수 있게 쓴다.
+- pass_criteria: **통과 기준을 반드시 측정 가능한 문장으로 쓴다.** "확인해보세요"는 점검이 아니다.
+  단 100% 재현으로 잡지 마라 — 생성형 답변은 매번 흔들려서 실제로 개선됐는데도 실패로 읽힌다.
+  "AI 3곳 중 2곳 이상에서 이름이 등장" 처럼 **다수결 형태로 느슨하게** 잡아라.
 모든 findings는 evidence_ids 배열에 근거가 된 evidence id를 포함해야 한다(없으면 빈 배열 대신 관련 있어 보이는 id를 최대한 연결).
 수집 실패는 미노출로 표현하지 마라. 확인된 사실과 추론·권고를 분리하라. 점수가 낮아도 비난하지 말고 수정 가능한 구조적 원인을 설명하라.
 ${FORBIDDEN_NOTICE}`;
@@ -534,6 +544,33 @@ function mockReport(input: GenerateReportInput): ReportNarrative {
         { q: "주로 어떤 고객과 함께 하나요?", a: `${input.audiences.join(", ") || "다양한 고객"}과 함께 합니다.` },
       ],
     },
+    recheck_checklist: [
+      {
+        item: "대표 1문장이 전 채널에 동일하게 적용됐는가",
+        how: "공식 사이트·인스타·유튜브 프로필 소개란을 나란히 열어 문장을 비교한다",
+        pass_criteria: "3개 채널 이상에서 문장이 한 글자도 다르지 않음",
+      },
+      {
+        item: "직접 검색에서 정체성이 정확히 설명되는가",
+        how: `ChatGPT·Perplexity·Gemini에 "${input.brandName}는 어떤 일을 하나요?"를 각각 입력한다`,
+        pass_criteria: `AI 3곳 중 2곳 이상이 "${input.categories[0] || "대표 카테고리"}"를 언급`,
+      },
+      {
+        item: "범주형 추천 질문에서 후보로 등장하는가",
+        how: `"${input.categories[0] || "해당 분야"} 전문가 추천해줘"를 AI 3곳에 각각 입력한다`,
+        pass_criteria: "AI 3곳 중 1곳 이상에서 후보로 등장 (진단 시점 0곳이었다면 1곳도 개선)",
+      },
+      {
+        item: "제3자 근거가 새로 확보됐는가",
+        how: "기고·인터뷰·행사 소개 등 본인이 운영하지 않는 사이트의 링크를 센다",
+        pass_criteria: "진단 시점 대비 제3자 출처 1건 이상 증가",
+      },
+      {
+        item: "최신 활동 신호가 살아 있는가",
+        how: "공식 사이트 '최근 소식' 섹션의 최상단 게시물 날짜를 확인한다",
+        pass_criteria: "최근 30일 이내 게시물이 1건 이상 존재",
+      },
+    ],
     limitations: ["본 진단은 사용자가 제출한 증거를 기반으로 하며 표본이 제한적일 수 있습니다.", "AI 응답은 시점·모델에 따라 달라질 수 있어 절대 순위가 아닌 관측 시점의 지표입니다."],
   };
 }
@@ -576,6 +613,7 @@ export function assembleReportJSON(params: {
     why_weak: params.narrative.why_weak,
     actions: params.narrative.actions,
     copy_assets: params.narrative.copy_assets,
+    recheck_checklist: params.narrative.recheck_checklist,
     limitations: params.narrative.limitations,
   };
 }

@@ -1,3 +1,4 @@
+import { isMockMode } from "./openai";
 import { EvidenceRow, Project, QueryRow, ReportJSON, ReportRow } from "./types";
 
 /**
@@ -74,6 +75,8 @@ export function buildReportHtml(input: ReportHtmlInput): string {
   });
 
   const queryById = new Map(queries.map((q) => [q.id, q]));
+  // 키가 없어 샘플 로직으로 만든 리포트인지. 표지에 경고를 띄우는 근거가 된다.
+  const isMock = isMockMode();
 
   return `<!DOCTYPE html>
 <html lang="ko"><head><meta charset="utf-8"><title>${esc(project.brand_name)} AI 추천도 리포트</title>
@@ -153,6 +156,11 @@ export function buildReportHtml(input: ReportHtmlInput): string {
 
   .pagebreak { page-break-before: always; }
   footer { margin-top: 26px; padding-top: 12px; border-top: 1px solid #e2e8f0; }
+  /* 데모(목업) 모드 경고. 실제 AI 판정이 아닌 결과가 고객에게 전달되는 사고를 막는다. */
+  .demo-warn { margin: 18px 0 0; padding: 12px 14px; border: 2px solid #dc2626;
+    border-radius: 6px; background: #fef2f2; color: #991b1b; }
+  .demo-warn b { font-size: 12pt; }
+  .demo-warn p { margin: 6px 0 0; font-size: 9pt; line-height: 1.6; color: #7f1d1d; }
 </style></head><body>
 
 <!-- 표지 -->
@@ -169,6 +177,17 @@ export function buildReportHtml(input: ReportHtmlInput): string {
       AI 추천이나 검색 순위를 보장하지 않습니다.
     </div>
   </div>
+  ${
+    isMock
+      ? `<div class="demo-warn">
+    <b>⚠ 데모(샘플) 리포트 — 실제 AI 진단 결과가 아닙니다</b>
+    <p>LLM API 키가 설정되지 않아 샘플 로직으로 생성된 문서입니다. 점수·판정·근거는 실제 측정값이
+    아니므로 고객에게 전달하거나 의사결정에 사용하지 마세요.<br>
+    실제 진단을 하려면 <code>.env.local</code>에 OPENAI_API_KEY 또는 ANTHROPIC_API_KEY를 넣고
+    서버를 다시 시작한 뒤 새로 진단하세요.</p>
+  </div>`
+      : ""
+  }
 </div>
 
 <!-- 요약 -->
@@ -286,6 +305,34 @@ export function buildReportHtml(input: ReportHtmlInput): string {
   }
 </section>
 
+<!-- 30일 재점검 체크리스트 (PRD F7) -->
+${
+  r.recheck_checklist?.length
+    ? `<section class="pagebreak">
+  <h2 class="sec-title">30일 재점검 체크리스트</h2>
+  <p class="sm muted" style="margin:0 0 10px">
+    위 액션을 실행한 뒤 30일이 지나면 아래 항목을 직접 점검하세요.
+    생성형 AI 답변은 매번 흔들리므로 통과 기준은 100% 재현이 아니라 다수결로 잡았습니다.
+  </p>
+  <table>
+    <thead><tr>
+      <th style="width:28%">점검 항목</th><th style="width:38%">확인 방법</th><th>통과 기준</th>
+    </tr></thead>
+    <tbody>
+      ${r.recheck_checklist
+        .map(
+          (c) =>
+            `<tr><td><b>${esc(c.item)}</b></td><td class="sm">${esc(c.how)}</td><td class="sm">${esc(
+              c.pass_criteria
+            )}</td></tr>`
+        )
+        .join("")}
+    </tbody>
+  </table>
+</section>`
+    : ""
+}
+
 <!-- 근거 -->
 <section class="pagebreak">
   <h2 class="sec-title">근거 부록 — 질문별 관측 결과</h2>
@@ -308,12 +355,23 @@ export function buildReportHtml(input: ReportHtmlInput): string {
             <td class="sm">${esc(q?.text ?? "(삭제된 질문)")}</td>
             <td class="sm">${esc(e.engine_label)}</td>
             <td class="sm">${esc(MENTION_LABEL[e.mention_type ?? ""] ?? "미판정")}</td>
-            <td class="xs muted">${cites.length ? cites.map((c) => esc(c)).join("<br>") : "-"}</td>
+            <td class="xs muted">${
+              cites.length
+                ? cites.map((c) => esc(c)).join("<br>")
+                : e.entity_found === 1
+                ? "출처 미표기"
+                : "—"
+            }</td>
           </tr>`;
         })
         .join("")}
     </tbody>
   </table>
+  <p class="xs muted" style="margin-top:8px">
+    "출처 미표기"는 브랜드가 언급됐으나 해당 답변이 인용 URL을 제시하지 않은 경우입니다.
+    엔진·질문에 따라 인용을 달지 않는 경우가 흔하며, 출처가 없다는 뜻은 아닙니다.
+    "—"는 브랜드가 응답에 등장하지 않은 경우입니다.
+  </p>
 </section>
 
 <footer class="xs muted">

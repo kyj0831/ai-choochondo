@@ -226,5 +226,12 @@ export interface ReportJSON {
     common_profile: string;
     faq: { q: string; a: string }[];
   };
+  /**
+   * 30일 재점검 체크리스트 (PRD F7).
+   * "확인해보세요"는 점검이 아니므로 항목마다 통과 기준을 반드시 갖는다.
+   * 기준은 100% 재현이 아니라 `AI 3곳 중 2곳 이상`처럼 다수결로 느슨하게 잡는다 —
+   * 생성형 답변은 매번 흔들려서 엄격하게 잡으면 개선됐는데도 실패로 읽힌다.
+   */
+  recheck_checklist?: { item: string; how: string; pass_criteria: string }[];
   limitations: string[];
 }
