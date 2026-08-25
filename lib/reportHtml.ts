@@ -305,6 +305,34 @@ export function buildReportHtml(input: ReportHtmlInput): string {
   }
 </section>
 
+<!-- 30일 재점검 체크리스트 (PRD F7) -->
+${
+  r.recheck_checklist?.length
+    ? `<section class="pagebreak">
+  <h2 class="sec-title">30일 재점검 체크리스트</h2>
+  <p class="sm muted" style="margin:0 0 10px">
+    위 액션을 실행한 뒤 30일이 지나면 아래 항목을 직접 점검하세요.
+    생성형 AI 답변은 매번 흔들리므로 통과 기준은 100% 재현이 아니라 다수결로 잡았습니다.
+  </p>
+  <table>
+    <thead><tr>
+      <th style="width:28%">점검 항목</th><th style="width:38%">확인 방법</th><th>통과 기준</th>
+    </tr></thead>
+    <tbody>
+      ${r.recheck_checklist
+        .map(
+          (c) =>
+            `<tr><td><b>${esc(c.item)}</b></td><td class="sm">${esc(c.how)}</td><td class="sm">${esc(
+              c.pass_criteria
+            )}</td></tr>`
+        )
+        .join("")}
+    </tbody>
+  </table>
+</section>`
+    : ""
+}
+
 <!-- 근거 -->
 <section class="pagebreak">
   <h2 class="sec-title">근거 부록 — 질문별 관측 결과</h2>
@@ -327,12 +355,23 @@ export function buildReportHtml(input: ReportHtmlInput): string {
             <td class="sm">${esc(q?.text ?? "(삭제된 질문)")}</td>
             <td class="sm">${esc(e.engine_label)}</td>
             <td class="sm">${esc(MENTION_LABEL[e.mention_type ?? ""] ?? "미판정")}</td>
-            <td class="xs muted">${cites.length ? cites.map((c) => esc(c)).join("<br>") : "-"}</td>
+            <td class="xs muted">${
+              cites.length
+                ? cites.map((c) => esc(c)).join("<br>")
+                : e.entity_found === 1
+                ? "출처 미표기"
+                : "—"
+            }</td>
           </tr>`;
         })
         .join("")}
     </tbody>
   </table>
+  <p class="xs muted" style="margin-top:8px">
+    "출처 미표기"는 브랜드가 언급됐으나 해당 답변이 인용 URL을 제시하지 않은 경우입니다.
+    엔진·질문에 따라 인용을 달지 않는 경우가 흔하며, 출처가 없다는 뜻은 아닙니다.
+    "—"는 브랜드가 응답에 등장하지 않은 경우입니다.
+  </p>
 </section>
 
 <footer class="xs muted">

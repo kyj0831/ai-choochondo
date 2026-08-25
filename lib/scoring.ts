@@ -162,25 +162,37 @@ export function computeScores(input: ScoringInput): ScoringResult {
   };
 
   // ---- D. 출처 신뢰도 (20) ----
-  const officialCiteRate = allUsable.length
-    ? allUsable.filter((e) => safeParseArray(e.source_types).some((t) => OFFICIAL_TYPES.includes(t as SourceType))).length /
-      allUsable.length
+  // 분모는 "브랜드가 실제로 등장한 응답"이다. 등장하지 않은 응답에는 그 브랜드를
+  // 뒷받침할 출처가 있을 수 없으므로, 미노출 건을 분모에 넣으면 축 B(추천 가시성)에서
+  // 이미 감점된 사실을 여기서 한 번 더 깎는 이중 감점이 된다. 그 결과 이 축의 상한이
+  // 노출률에 묶여(노출 50% → 공식 출처 최대 4/8) 출처를 아무리 보강해도 점수가
+  // 오르지 않았다. 축 C(설명 정확도)가 이미 entity_found로 거르는 것과 같은 기준이다.
+  const foundUsable = allUsable.filter((e) => e.entity_found === 1);
+  const trustDenom = foundUsable.length;
+
+  const officialCiteRate = trustDenom
+    ? foundUsable.filter((e) => safeParseArray(e.source_types).some((t) => OFFICIAL_TYPES.includes(t as SourceType))).length /
+      trustDenom
     : 0;
   const officialSourceScore = officialCiteRate * 8;
 
-  const thirdPartyRate = allUsable.length
-    ? allUsable.filter((e) => safeParseArray(e.source_types).some((t) => THIRD_PARTY_AUTHORITY_TYPES.includes(t as SourceType))).length /
-      allUsable.length
+  const thirdPartyRate = trustDenom
+    ? foundUsable.filter((e) => safeParseArray(e.source_types).some((t) => THIRD_PARTY_AUTHORITY_TYPES.includes(t as SourceType))).length /
+      trustDenom
     : 0;
   const thirdPartyScore = thirdPartyRate * 6;
 
-  const distinctSourceTypes = new Set(allUsable.flatMap((e) => safeParseArray(e.source_types)));
+  const distinctSourceTypes = new Set(foundUsable.flatMap((e) => safeParseArray(e.source_types)));
   const diversityScore = Math.min(1, distinctSourceTypes.size / 4) * 4;
 
-  const citationRate = allUsable.length
-    ? allUsable.filter((e) => safeParseArray(e.citations).length > 0).length / allUsable.length
+  const citationRate = trustDenom
+    ? foundUsable.filter((e) => safeParseArray(e.citations).length > 0).length / trustDenom
     : 0;
   const transparencyScore = citationRate * 2;
+
+  // 등장 자체가 0건이면 출처를 평가할 근거가 없다. 중간값으로 메우지 않고 판정보류로
+  // 표시한다(PRD 13.8 — 모르는 것을 기본 점수로 채우면 점수가 정보가 아니게 된다).
+  const trustUnknown = trustDenom === 0;
 
   const axisD: AxisScore = {
     axis: "trust",
@@ -193,7 +205,11 @@ export function computeScores(input: ScoringInput): ScoringResult {
       { label: "출처 다양성", max: 4, value: round1(diversityScore) },
       { label: "인용 투명성", max: 2, value: round1(transparencyScore) },
     ],
-    judgment: officialCiteRate > 0.6 ? "공식 출처 기반이 안정적임" : "공식·제3자 출처 보강이 필요함",
+    judgment: trustUnknown
+      ? "판정보류 — 브랜드가 등장한 응답이 없어 출처를 평가할 수 없음"
+      : officialCiteRate > 0.6
+      ? "공식 출처 기반이 안정적임"
+      : "공식·제3자 출처 보강이 필요함",
   };
 
   // ---- E. 일관성·최신성 (10) ----
