@@ -234,7 +234,16 @@ export default function EvidencePage({ params }: { params: { id: string } }) {
   }
 
   // 시연·체험용: 모든 질문에 샘플 답변을 채운 뒤 곧바로 분석까지 실행한다.
+  // 이 데이터는 브랜드명만 바뀌어 들어가는 고정 문구라 실제 진단과 결과가
+  // 다르다. 실수로 눌러 진짜 진단인 줄 알고 고객에게 전달하는 사고가 있었으므로
+  // 확인 절차를 거친다.
   async function fillSampleAndAnalyze() {
+    const ok = window.confirm(
+      "샘플 데이터는 브랜드명만 바뀐 고정 문구라, 어떤 브랜드를 넣어도 점수·근거가 거의 똑같이 나옵니다.\n\n" +
+        "실제 진단이 아니므로 화면 구경용으로만 쓰고, 이 결과를 고객에게 전달하지 마세요.\n\n" +
+        "그래도 데모로 채워볼까요?"
+    );
+    if (!ok) return;
     setFilling(true);
     setError("");
     try {
@@ -270,9 +279,9 @@ export default function EvidencePage({ params }: { params: { id: string } }) {
           </button>
           {judgedQueryIds.size === 0 && (
             <>
-              <span className="text-xs text-slate-400">답변을 직접 넣거나, 아래 버튼으로 체험해보세요</span>
-              <button onClick={fillSampleAndAnalyze} disabled={filling} className="btn-secondary text-xs">
-                {filling ? "샘플 채우는 중..." : "⚡ 샘플 답변으로 바로 체험하기"}
+              <span className="text-xs text-slate-400">답변을 직접 넣거나, 아래 버튼으로 화면만 미리 체험해보세요</span>
+              <button onClick={fillSampleAndAnalyze} disabled={filling} className="btn-secondary text-xs text-amber-700">
+                {filling ? "샘플 채우는 중..." : "⚡ [데모] 가짜 답변으로 화면만 미리 보기"}
               </button>
             </>
           )}

@@ -139,6 +139,17 @@ export default function ReportPage({ params }: { params: { id: string } }) {
         </div>
       </div>
 
+      {evidence.some((e) => e.is_sample === 1) && (
+        <div className="mb-6 rounded-lg border-2 border-red-500 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <p className="font-semibold">⚠ 데모(샘플) 리포트 — 실제 AI 진단 결과가 아닙니다</p>
+          <p className="mt-1 text-xs leading-relaxed text-red-700">
+            "샘플 답변으로 바로 체험하기"로 채운 가짜 답변이 포함돼 있어 점수·근거가 실제 측정값이
+            아닙니다. 어떤 브랜드를 넣어도 결과가 거의 같게 나옵니다. 고객에게 전달하지 마세요.
+            새 진단을 만들어 각 질문에 진짜 ChatGPT·Perplexity·Gemini 답변을 직접 붙여넣으세요.
+          </p>
+        </div>
+      )}
+
       {/* 1. 한 줄 진단 + 2. 총점/신뢰도 */}
       <div className="card p-6 mb-5">
         <p className="text-lg leading-relaxed mb-5">{r.summary.one_line}</p>

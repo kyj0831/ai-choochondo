@@ -75,8 +75,11 @@ export function buildReportHtml(input: ReportHtmlInput): string {
   });
 
   const queryById = new Map(queries.map((q) => [q.id, q]));
-  // 키가 없어 샘플 로직으로 만든 리포트인지. 표지에 경고를 띄우는 근거가 된다.
-  const isMock = isMockMode();
+  // 표지에 경고를 띄우는 두 가지 근거: 키가 없어 채점 자체가 샘플 로직으로
+  // 돌았거나(isMock), 증거 수집 단계에서 "샘플 답변으로 체험하기"로 채워
+  // 넣은 가짜 답변이 하나라도 섞여 있는 경우(hasSampleEvidence). 실제 키가
+  // 있어도 후자는 진짜 진단이 아니므로 반드시 함께 확인해야 한다.
+  const isMock = isMockMode() || evidence.some((e) => e.is_sample === 1);
 
   return `<!DOCTYPE html>
 <html lang="ko"><head><meta charset="utf-8"><title>${esc(project.brand_name)} AI 추천도 리포트</title>
@@ -181,10 +184,18 @@ export function buildReportHtml(input: ReportHtmlInput): string {
     isMock
       ? `<div class="demo-warn">
     <b>⚠ 데모(샘플) 리포트 — 실제 AI 진단 결과가 아닙니다</b>
-    <p>LLM API 키가 설정되지 않아 샘플 로직으로 생성된 문서입니다. 점수·판정·근거는 실제 측정값이
+    <p>${
+      evidence.some((e) => e.is_sample === 1)
+        ? `증거 수집 단계에서 "샘플 답변으로 바로 체험하기"로 채운 가짜 답변이 포함돼 있습니다.
+    문장·점수·신뢰도가 브랜드와 무관하게 고정된 값이라, 어떤 브랜드를 넣어도 결과가 거의
+    같게 나옵니다. 고객에게 전달하거나 의사결정에 사용하지 마세요.<br>
+    실제 진단을 하려면 이 진단 대신 새 진단을 만들고, 각 질문에 진짜 ChatGPT·Perplexity·
+    Gemini 답변을 직접 붙여넣으세요.`
+        : `LLM API 키가 설정되지 않아 샘플 로직으로 생성된 문서입니다. 점수·판정·근거는 실제 측정값이
     아니므로 고객에게 전달하거나 의사결정에 사용하지 마세요.<br>
     실제 진단을 하려면 <code>.env.local</code>에 OPENAI_API_KEY 또는 ANTHROPIC_API_KEY를 넣고
-    서버를 다시 시작한 뒤 새로 진단하세요.</p>
+    서버를 다시 시작한 뒤 새로 진단하세요.`
+    }</p>
   </div>`
       : ""
   }
