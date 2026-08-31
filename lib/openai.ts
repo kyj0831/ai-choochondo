@@ -41,12 +41,12 @@ export const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-8";
 let openaiClient: OpenAI | null = null;
 let anthropicClient: Anthropic | null = null;
 
-function getOpenAI(): OpenAI {
+export function getOpenAI(): OpenAI {
   if (!openaiClient) openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   return openaiClient;
 }
 
-function getAnthropic(): Anthropic {
+export function getAnthropic(): Anthropic {
   // Zero-arg constructor also resolves ANTHROPIC_AUTH_TOKEN or an
   // `ant auth login` profile if present on the machine.
   if (!anthropicClient) anthropicClient = new Anthropic();
