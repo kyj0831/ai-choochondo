@@ -35,6 +35,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       engine_label: engine,
       response_text: text,
       status: "collected",
+      is_sample: true,
     });
     updateEvidenceJudgment(ev.id, judgment);
   });

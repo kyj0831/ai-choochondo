@@ -85,6 +85,7 @@ function migrate(db: Database.Database) {
       citations TEXT,
       confidence REAL,
       judged_at TEXT,
+      is_sample INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -156,6 +157,9 @@ function migrate(db: Database.Database) {
   // 기존 DB에 나중에 추가된 컬럼을 보정한다. CREATE TABLE IF NOT EXISTS는
   // 이미 만들어진 테이블에 새 컬럼을 넣어주지 않기 때문이다.
   addColumnIfMissing(db, "hubs", "published_at", "TEXT");
+  // 샘플(데모) 증거로 채워진 진단을 리포트에서 구분하기 위한 표식.
+  // 실제 AI 답변 없이 만들어진 리포트가 진짜 진단처럼 보이는 사고를 막는다.
+  addColumnIfMissing(db, "evidence", "is_sample", "INTEGER NOT NULL DEFAULT 0");
 }
 
 function addColumnIfMissing(db: Database.Database, table: string, column: string, ddl: string) {

@@ -86,6 +86,7 @@ export interface EvidenceRow {
   citations: string | null; // JSON string[] (urls)
   confidence: number | null;
   judged_at: string | null;
+  is_sample: number;
   created_at: string;
 }
 
