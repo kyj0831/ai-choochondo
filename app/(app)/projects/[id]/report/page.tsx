@@ -258,6 +258,72 @@ export default function ReportPage({ params }: { params: { id: string } }) {
         <p className="text-sm text-slate-600 leading-relaxed">{r.why_weak}</p>
       </div>
 
+      {/* AI가 지금 우리를 어떻게 아는가 */}
+      {r.ai_perception && (
+        <div className="card p-6 mb-5">
+          <h2 className="font-semibold mb-2">AI는 지금 우리를 이렇게 알고 있다</h2>
+          <p className="text-sm text-slate-600 leading-relaxed mb-4">{r.ai_perception.current_summary}</p>
+          {r.ai_perception.wrong_or_outdated?.length > 0 && (
+            <div className="mb-3 border-l-2 border-red-400 pl-3">
+              <p className="text-xs font-semibold text-red-700 mb-1">틀렸거나 오래된 설명</p>
+              <ul className="text-xs text-slate-600 list-disc pl-4 space-y-0.5">
+                {r.ai_perception.wrong_or_outdated.map((x, i) => (
+                  <li key={i}>{x}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {r.ai_perception.missing?.length > 0 && (
+            <div className="border-l-2 border-amber-400 pl-3">
+              <p className="text-xs font-semibold text-amber-700 mb-1">AI가 모르는 핵심 정보</p>
+              <ul className="text-xs text-slate-600 list-disc pl-4 space-y-0.5">
+                {r.ai_perception.missing.map((x, i) => (
+                  <li key={i}>{x}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 검색 갭 — 왜 안 나오고 뭘 고치면 되는가 */}
+      {r.search_gaps && r.search_gaps.length > 0 && (
+        <div className="card p-6 mb-5">
+          <h2 className="font-semibold mb-1">검색 갭 — 왜 안 나오고, 뭘 고치면 나오는가</h2>
+          <p className="text-xs text-slate-400 mb-4">
+            실제로 물어본 질문 중 노출이 약한 것부터 정리했습니다. "이렇게 고친다"를 그대로 실행하면 다음 재점검에서 결과가 달라집니다.
+          </p>
+          <div className="space-y-3">
+            {r.search_gaps.map((g, i) => (
+              <div key={i} className="border border-slate-200 rounded-lg p-3">
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <p className="text-sm font-medium">{g.query}</p>
+                  <span
+                    className={`badge shrink-0 ${
+                      g.status === "노출"
+                        ? "bg-emerald-100 text-emerald-700"
+                        : g.status === "약함"
+                        ? "bg-amber-100 text-amber-700"
+                        : "bg-red-100 text-red-700"
+                    }`}
+                  >
+                    {g.status}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mb-1.5">
+                  <span className="font-semibold text-slate-600">왜: </span>
+                  {g.why}
+                </p>
+                <p className="text-xs text-slate-600">
+                  <span className="font-semibold text-brand-600">고치는 법: </span>
+                  {g.fix}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* 7. 우선 액션 5개 + 단계별 실행 가이드 */}
       <div className="card p-6 mb-5">
         <h2 className="font-semibold mb-1">우선 액션 · 실행 가이드</h2>

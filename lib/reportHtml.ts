@@ -273,6 +273,69 @@ export function buildReportHtml(input: ReportHtmlInput): string {
   <p style="margin:0">${esc(r.why_weak)}</p>
 </section>
 
+<!-- AI가 지금 우리를 어떻게 아는가 -->
+${
+  r.ai_perception
+    ? `<section class="pagebreak">
+  <h2 class="sec-title">AI는 지금 우리를 이렇게 알고 있다</h2>
+  <p style="margin:0 0 12px">${esc(r.ai_perception.current_summary)}</p>
+  ${
+    r.ai_perception.wrong_or_outdated?.length
+      ? `<div class="card" style="border-left:3px solid #dc2626; padding-left:10px; margin-bottom:10px">
+    <div class="sm" style="font-weight:700; color:#991b1b; margin-bottom:4px">틀렸거나 오래된 설명</div>
+    <ul class="sm" style="margin:0; padding-left:16px">
+      ${r.ai_perception.wrong_or_outdated.map((x) => `<li>${esc(x)}</li>`).join("")}
+    </ul>
+  </div>`
+      : ""
+  }
+  ${
+    r.ai_perception.missing?.length
+      ? `<div class="card" style="border-left:3px solid #d97706; padding-left:10px">
+    <div class="sm" style="font-weight:700; color:#92400e; margin-bottom:4px">AI가 모르는 핵심 정보</div>
+    <ul class="sm" style="margin:0; padding-left:16px">
+      ${r.ai_perception.missing.map((x) => `<li>${esc(x)}</li>`).join("")}
+    </ul>
+  </div>`
+      : ""
+  }
+</section>`
+    : ""
+}
+
+<!-- 검색 갭: 왜 안 나오고 뭘 고치면 되는가 -->
+${
+  r.search_gaps?.length
+    ? `<section class="pagebreak">
+  <h2 class="sec-title">검색 갭 — 왜 안 나오고, 뭘 고치면 나오는가</h2>
+  <p class="sm muted" style="margin:0 0 10px">
+    실제로 물어본 질문 중 노출이 약한 것부터 정리했습니다. 각 항목의 "이렇게 고친다"를
+    그대로 실행하면 다음 재점검에서 결과가 달라집니다.
+  </p>
+  <table>
+    <thead><tr>
+      <th style="width:26%">질문</th><th style="width:10%">현재</th>
+      <th style="width:32%">왜 이렇게 나오나</th><th>이렇게 고친다</th>
+    </tr></thead>
+    <tbody>
+      ${r.search_gaps
+        .map(
+          (g) => `<tr>
+        <td class="sm">${esc(g.query)}</td>
+        <td class="sm"><b style="color:${
+          g.status === "노출" ? "#059669" : g.status === "약함" ? "#d97706" : "#dc2626"
+        }">${esc(g.status)}</b></td>
+        <td class="sm">${esc(g.why)}</td>
+        <td class="sm">${esc(g.fix)}</td>
+      </tr>`
+        )
+        .join("")}
+    </tbody>
+  </table>
+</section>`
+    : ""
+}
+
 <!-- 액션 -->
 <section class="pagebreak">
   <h2 class="sec-title">우선 실행 액션</h2>
