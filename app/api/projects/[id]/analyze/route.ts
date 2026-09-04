@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getProject, listAssets, listEvidence, listQueries, saveReport, updateProjectStatus } from "@/lib/repo";
+import { getProject, listAssets, listEvidence, listFacts, listQueries, saveReport, updateProjectStatus } from "@/lib/repo";
 import { computeScores } from "@/lib/scoring";
 import { assembleReportJSON, generateReportNarrative } from "@/lib/llm";
 import { EntityType } from "@/lib/types";
@@ -45,6 +45,9 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       gradeLabel: scoring.gradeLabel,
       queries,
       evidence,
+      groundTruth: listFacts(params.id)
+        .filter((f) => f.approved)
+        .map((f) => ({ field: f.field, value: f.value })),
     });
 
     const reportJson = assembleReportJSON({

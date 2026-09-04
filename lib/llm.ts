@@ -398,6 +398,11 @@ export interface GenerateReportInput {
   gradeLabel: string;
   queries: QueryRow[];
   evidence: EvidenceRow[];
+  /**
+   * 승인된 사실 기준선. ai_perception의 "틀렸다/모른다"를 판단하려면
+   * 무엇이 참인지 모델이 알아야 한다.
+   */
+  groundTruth?: { field: string; value: string }[];
 }
 
 export interface ReportNarrative {
@@ -412,6 +417,12 @@ export interface ReportNarrative {
     common_profile: string;
     faq: { q: string; a: string }[];
   };
+  ai_perception?: {
+    current_summary: string;
+    wrong_or_outdated: string[];
+    missing: string[];
+  };
+  search_gaps?: { query: string; status: "미노출" | "약함" | "노출"; why: string; fix: string }[];
   recheck_checklist?: { item: string; how: string; pass_criteria: string }[];
   limitations: string[];
 }
@@ -424,8 +435,34 @@ export async function generateReportNarrative(input: GenerateReportInput): Promi
 "why_weak": string(추천에서 약한 구조적 이유 설명), "actions": [{"priority":1..5,"title":string,"channel":string,"rationale":string,"copy":string,"steps":string[]}] (정확히 5개, 우선순위 순.
 steps는 3~5개의 단계별 실행 가이드로, 마케팅 지식이 없는 고객사 담당자가 그대로 따라 할 수 있게 명령형 한 문장씩 작성하라 — 어디에 로그인/접속해서, 무엇을 열고, 어떤 문안을 어디에 붙여넣는지 수준으로 구체적으로),
 "copy_assets": {"one_sentence":string,"three_sentence":string,"meta_description":string,"common_profile":string,"faq":[{"q":string,"a":string}](4~6개)},
+"ai_perception": {"current_summary":string,"wrong_or_outdated":string[],"missing":string[]},
+"search_gaps": [{"query":string,"status":"미노출"|"약함"|"노출","why":string,"fix":string}] (6~10개),
 "recheck_checklist": [{"item":string,"how":string,"pass_criteria":string}] (정확히 5개),
 "limitations": string[] (표본·수집 한계 고지 문구 2~4개)}
+
+## ai_perception 작성 규칙 (AI가 지금 나를 어떻게 알고 있는가)
+이 리포트를 받는 사람이 가장 먼저 궁금해하는 건 점수가 아니라
+"그래서 챗GPT가 나를 뭐라고 설명하는데?"다. 증거의 원문 답변들을 종합해서 답하라.
+- current_summary: 여러 엔진 답변을 합쳤을 때 AI가 현재 이 브랜드를 어떻게 소개하는지
+  2~4문장으로. 미화하지 말고 실제 답변에 나온 표현 위주로 쓴다. 대부분의 엔진이
+  모른다고 답했으면 "AI 대부분이 이 이름을 인식하지 못한다"고 그대로 쓴다.
+- wrong_or_outdated: ground truth와 어긋나거나 과거 정보로 보이는 서술을 나열.
+  없으면 빈 배열. 지어내지 마라.
+- missing: 사용자가 제공한 사실 중 AI 답변에 전혀 등장하지 않은 핵심 정보.
+  "이건 사실인데 AI가 모른다"에 해당하는 것만.
+
+## search_gaps 작성 규칙 (왜 안 나오는가 → 뭘 고치면 나오는가) ★가장 중요
+근거 부록이 "미노출/단순 언급" 같은 결과만 나열하면 받는 사람이 할 수 있는 게 없다.
+질문 하나하나를 실행 가능한 처방으로 바꾸는 게 이 섹션의 목적이다.
+- 실제 측정한 질문 중에서 고른다. 질문을 새로 지어내지 마라.
+- 미노출·약하게 나온 질문을 우선으로 담되, 잘 나온 질문도 1~2개 넣어 대비를 보여준다.
+- why: "노출이 안 됨" 같은 동어반복 금지. **구조적 원인**을 짚어라. 예:
+  "이 질문은 카테고리 추천형인데, 공식 채널 어디에도 '<카테고리>'라는 말이
+  대표 문장으로 박혀 있지 않아 AI가 이 브랜드를 그 범주의 후보로 묶지 못한다."
+- fix: **어디에 무엇을 쓰면 되는지**까지. "콘텐츠를 늘리세요" 같은 일반론 금지. 예:
+  "공식 사이트 첫 화면 소개문 첫 문장을 '<브랜드>는 <청중>을 위한 <카테고리>입니다'로
+  바꾸고, 같은 문장을 인스타·유튜브 프로필에도 동일하게 넣는다."
+- status는 증거의 실제 판정과 일치해야 한다(추천 포함=노출, 단순 언급=약함, 미노출=미노출).
 
 ## recheck_checklist 작성 규칙 (30일 뒤 스스로 점검하는 표)
 - item: 무엇을 점검하는가. 위 actions에서 실행한 개선이 실제로 먹혔는지 확인하는 항목으로 잡아라.
@@ -437,13 +474,20 @@ steps는 3~5개의 단계별 실행 가이드로, 마케팅 지식이 없는 고
 수집 실패는 미노출로 표현하지 마라. 확인된 사실과 추론·권고를 분리하라. 점수가 낮아도 비난하지 말고 수정 가능한 구조적 원인을 설명하라.
 ${FORBIDDEN_NOTICE}`;
 
+  // ai_perception("AI가 나를 뭐라고 설명하나")과 search_gaps의 why를 쓰려면 판정 결과만으로는
+  // 부족하고 실제 답변 원문이 필요하다. 다만 전체를 다 넣으면 토큰이 폭증하므로 발췌만 넣는다.
   const evidenceSummary = input.evidence
     .filter((e) => e.judged_at)
     .map((e) => {
       const q = input.queries.find((qq) => qq.id === e.query_id);
-      return `[${e.id}] (${q?.type}/${q?.sub_category ?? "-"}) Q: "${q?.text}" → found=${e.entity_found} mention=${e.mention_type} accuracy=${e.description_accuracy} conflicts=${e.conflicts}`;
+      const excerpt = (e.response_text || "").replace(/\s+/g, " ").slice(0, 400);
+      return `[${e.id}] (${q?.type}/${q?.sub_category ?? "-"}) 엔진=${e.engine_label} Q: "${q?.text}"
+   판정: found=${e.entity_found} mention=${e.mention_type} accuracy=${e.description_accuracy} conflicts=${e.conflicts}
+   답변 발췌: "${excerpt}"`;
     })
     .join("\n");
+
+  const groundTruthText = (input.groundTruth ?? []).map((g) => `- ${g.field}: ${g.value}`).join("\n");
 
   const user = `브랜드: ${input.brandName} (${input.entityType})
 지역: ${input.region}
@@ -451,10 +495,13 @@ ${FORBIDDEN_NOTICE}`;
 목표 청중: ${input.audiences.join(", ")}
 공식 자산: ${input.officialAssets.join(", ") || "(없음)"}
 
+승인된 사실(ground truth) — AI 답변이 이것과 어긋나면 wrong_or_outdated, 이게 답변에 아예 없으면 missing:
+${groundTruthText || "(없음)"}
+
 5축 점수 (총점 ${input.total}/100, 등급 ${input.grade} · ${input.gradeLabel}):
 ${input.axes.map((a) => `- ${a.label}: ${a.raw}/${a.max} (${a.judgment})`).join("\n")}
 
-증거 요약:
+증거(질문별 판정 + AI 답변 원문 발췌):
 ${evidenceSummary || "(증거 없음)"}`;
 
   return callJSON<ReportNarrative>(system, user);
@@ -544,6 +591,34 @@ function mockReport(input: GenerateReportInput): ReportNarrative {
         { q: "주로 어떤 고객과 함께 하나요?", a: `${input.audiences.join(", ") || "다양한 고객"}과 함께 합니다.` },
       ],
     },
+    ai_perception: {
+      current_summary: `AI 대부분은 ${input.brandName}를 "${
+        input.categories[0] || "해당 분야"
+      } 분야에서 활동하는 곳" 정도로만 설명합니다. 무엇을 누구에게 어떻게 제공하는지, 다른 곳과 뭐가 다른지는 답변에 거의 나오지 않습니다.`,
+      wrong_or_outdated: [],
+      missing: [
+        `구체적인 서비스 범위와 대상 (${input.audiences[0] || "고객"} 대상이라는 사실이 AI 답변에 등장하지 않음)`,
+        "제3자가 검증한 실적·사례 (AI가 인용할 수 있는 외부 근거 없음)",
+      ],
+    },
+    search_gaps: [
+      {
+        query: `${input.categories[0] || "해당 분야"} 전문가 추천해줘`,
+        status: "미노출",
+        why: `이 질문은 카테고리 추천형인데, 공식 채널 어디에도 "${
+          input.categories[0] || "해당 분야"
+        }"가 대표 문장으로 박혀 있지 않아 AI가 이 브랜드를 그 범주의 후보로 묶지 못합니다.`,
+        fix: `공식 사이트 첫 화면 소개문 첫 문장을 "${input.brandName}는 ${
+          input.audiences[0] || "고객"
+        }을 위한 ${input.categories[0] || "해당 분야"} 전문가입니다"로 바꾸고, 같은 문장을 SNS 프로필에도 동일하게 넣으세요.`,
+      },
+      {
+        query: `${input.brandName}에 대해 알려줘`,
+        status: "약함",
+        why: "이름은 인식하지만 설명이 일반적입니다. AI가 인용할 만한 구체적 사실(대상·방식·실적)이 공개 채널에 정리돼 있지 않습니다.",
+        fix: "공식 사이트에 '서비스 안내' 섹션을 만들고 대상·해결하는 문제·제공 방식을 각 한 문단으로 적으세요.",
+      },
+    ],
     recheck_checklist: [
       {
         item: "대표 1문장이 전 채널에 동일하게 적용됐는가",
@@ -613,6 +688,8 @@ export function assembleReportJSON(params: {
     why_weak: params.narrative.why_weak,
     actions: params.narrative.actions,
     copy_assets: params.narrative.copy_assets,
+    ai_perception: params.narrative.ai_perception,
+    search_gaps: params.narrative.search_gaps,
     recheck_checklist: params.narrative.recheck_checklist,
     limitations: params.narrative.limitations,
   };
