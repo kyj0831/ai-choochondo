@@ -14,14 +14,33 @@ import Anthropic from "@anthropic-ai/sdk";
 
 export type LLMProvider = "openai" | "anthropic" | "mock";
 
+/**
+ * 자리표시자(placeholder)를 진짜 키로 오인하지 않게 거른다.
+ *
+ * .env.local.example 이 배포되던 시절 `OPENAI_API_KEY=sk-...` 라는 예시 값이
+ * 그대로 .env.local 로 복사됐고, 앱은 "키가 있다"고 판단해 실제 호출을 시도하다
+ * 401 Incorrect API key 로 죽었다. 사용자 입장에서는 키를 넣은 적도 없는데
+ * 에러만 보이는 상황이라, 아예 키가 없는 것으로 취급해 데모 모드로 보낸다.
+ */
+export function readApiKey(name: string): string | undefined {
+  const raw = process.env[name];
+  if (!raw) return undefined;
+  const v = raw.trim().replace(/^["']|["']$/g, "");
+  if (!v) return undefined;
+  if (v.includes("...") || v.includes("…")) return undefined;      // sk-... 같은 예시
+  if (/^(your|여기|xxx|changeme|placeholder)/i.test(v)) return undefined;
+  if (v.length < 20) return undefined;                              // 실제 키는 훨씬 길다
+  return v;
+}
+
 let warned = false;
 
 export function getProvider(): LLMProvider {
   if (process.env.MOCK_LLM === "1") return "mock";
   const forced = process.env.LLM_PROVIDER;
   if (forced === "openai" || forced === "anthropic" || forced === "mock") return forced;
-  if (process.env.OPENAI_API_KEY) return "openai";
-  if (process.env.ANTHROPIC_API_KEY) return "anthropic";
+  if (readApiKey("OPENAI_API_KEY")) return "openai";
+  if (readApiKey("ANTHROPIC_API_KEY")) return "anthropic";
   if (!warned) {
     console.warn(
       "[AI 추천도] OPENAI_API_KEY / ANTHROPIC_API_KEY가 없어 데모(목업) 모드로 동작합니다. .env.local에 키를 추가하면 실제 LLM 분석이 활성화됩니다."
@@ -42,14 +61,17 @@ let openaiClient: OpenAI | null = null;
 let anthropicClient: Anthropic | null = null;
 
 export function getOpenAI(): OpenAI {
-  if (!openaiClient) openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  if (!openaiClient) openaiClient = new OpenAI({ apiKey: readApiKey("OPENAI_API_KEY") });
   return openaiClient;
 }
 
 export function getAnthropic(): Anthropic {
   // Zero-arg constructor also resolves ANTHROPIC_AUTH_TOKEN or an
   // `ant auth login` profile if present on the machine.
-  if (!anthropicClient) anthropicClient = new Anthropic();
+  if (!anthropicClient) {
+    const key = readApiKey("ANTHROPIC_API_KEY");
+    anthropicClient = key ? new Anthropic({ apiKey: key }) : new Anthropic();
+  }
   return anthropicClient;
 }
 

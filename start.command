@@ -22,7 +22,17 @@ if [ ! -f .env.local ]; then
   cp .env.local.example .env.local 2>/dev/null
 fi
 
-if ! grep -qE '^\s*(OPENAI_API_KEY|ANTHROPIC_API_KEY)\s*=\s*(sk-|sk-ant-)' .env.local 2>/dev/null; then
+# 키가 "있는 것처럼 보이기만" 하는 경우를 걸러낸다. 예시 파일에 있던
+# `OPENAI_API_KEY=sk-...` 를 진짜 키로 오인해 실제 호출을 시도하다
+# 401 Incorrect API key 가 났던 사고가 있었다. 여기서는 sk- 로 시작하면서
+# 점 세 개(...)가 없고 길이가 30자 이상인 값만 진짜 키로 인정한다.
+has_real_key() {
+  grep -E '^[[:space:]]*(OPENAI_API_KEY|ANTHROPIC_API_KEY)[[:space:]]*=' .env.local 2>/dev/null \
+    | sed -E 's/^[^=]*=[[:space:]]*//; s/^["'"'"']//; s/["'"'"']$//' \
+    | grep -qE '^(sk-|sk-ant-)[A-Za-z0-9_-]{27,}$'
+}
+
+if ! has_real_key; then
   echo ""
   echo "⚠️  데모(샘플) 모드로 실행됩니다 — 실제 AI 진단이 아닙니다."
   echo ""
@@ -31,6 +41,8 @@ if ! grep -qE '^\s*(OPENAI_API_KEY|ANTHROPIC_API_KEY)\s*=\s*(sk-|sk-ant-)' .env.
   echo "   2) 이 폴더의 '.env.local' 파일을 텍스트편집기로 열기"
   echo "   3) OPENAI_API_KEY=sk-... 줄에 본인 키를 붙여넣고 저장"
   echo "   4) 이 창에서 Ctrl+C로 끄고 start.command를 다시 실행"
+  echo ""
+  echo "   (더 쉬운 방법: 같은 폴더의 '키넣기.command' 를 더블클릭하세요.)"
   echo ""
   echo "   (데모 모드로 만든 리포트에는 표지에 경고가 찍히며, 고객에게 전달하면 안 됩니다.)"
   echo ""

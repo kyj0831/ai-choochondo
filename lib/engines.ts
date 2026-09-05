@@ -1,5 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import { getAnthropic, getOpenAI } from "./openai";
+import { getAnthropic, getOpenAI, readApiKey } from "./openai";
 
 /**
  * 여러 AI 엔진에 질문을 자동으로 던지고 원문 응답(+가능하면 인용 링크)을 받아온다.
@@ -43,10 +43,10 @@ export class EngineNotConfiguredError extends Error {
 /** 자동 수집을 실행하려는 시점에 실제로 부를 수 있는 엔진 목록. */
 export function configuredEngines(): EngineName[] {
   const engines: EngineName[] = [];
-  if (process.env.OPENAI_API_KEY) engines.push("ChatGPT");
-  if (process.env.ANTHROPIC_API_KEY) engines.push("Claude");
-  if (process.env.GEMINI_API_KEY) engines.push("Gemini");
-  if (process.env.PERPLEXITY_API_KEY) engines.push("Perplexity");
+  if (readApiKey("OPENAI_API_KEY")) engines.push("ChatGPT");
+  if (readApiKey("ANTHROPIC_API_KEY")) engines.push("Claude");
+  if (readApiKey("GEMINI_API_KEY")) engines.push("Gemini");
+  if (readApiKey("PERPLEXITY_API_KEY")) engines.push("Perplexity");
   return engines;
 }
 
@@ -68,7 +68,7 @@ export async function probeEngine(engine: EngineName, queryText: string): Promis
 }
 
 async function probeOpenAI(queryText: string): Promise<ProbeResult> {
-  if (!process.env.OPENAI_API_KEY) throw new EngineNotConfiguredError("ChatGPT");
+  if (!readApiKey("OPENAI_API_KEY")) throw new EngineNotConfiguredError("ChatGPT");
   const model = process.env.OPENAI_PROBE_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini";
   const completion = await getOpenAI().chat.completions.create({
     model,
@@ -82,7 +82,7 @@ async function probeOpenAI(queryText: string): Promise<ProbeResult> {
 }
 
 async function probeAnthropic(queryText: string): Promise<ProbeResult> {
-  if (!process.env.ANTHROPIC_API_KEY) throw new EngineNotConfiguredError("Claude");
+  if (!readApiKey("ANTHROPIC_API_KEY")) throw new EngineNotConfiguredError("Claude");
   const model = process.env.ANTHROPIC_PROBE_MODEL || process.env.ANTHROPIC_MODEL || "claude-opus-4-8";
   const message = await getAnthropic().messages.create({
     model,
@@ -98,7 +98,7 @@ async function probeAnthropic(queryText: string): Promise<ProbeResult> {
 }
 
 async function probePerplexity(queryText: string): Promise<ProbeResult> {
-  const apiKey = process.env.PERPLEXITY_API_KEY;
+  const apiKey = readApiKey("PERPLEXITY_API_KEY");
   if (!apiKey) throw new EngineNotConfiguredError("Perplexity");
   const model = process.env.PERPLEXITY_MODEL || "sonar";
 
@@ -127,7 +127,7 @@ async function probePerplexity(queryText: string): Promise<ProbeResult> {
 }
 
 async function probeGemini(queryText: string): Promise<ProbeResult> {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = readApiKey("GEMINI_API_KEY");
   if (!apiKey) throw new EngineNotConfiguredError("Gemini");
   const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
 
