@@ -13,6 +13,26 @@ if [ ! -d node_modules ]; then
   npm install
 fi
 
+# 이미 서버가 켜져 있는데 또 실행하면, 아래 rm -rf .next 가 "돌아가고 있는"
+# 서버의 빌드 파일을 지워버린다. 그러면 모든 페이지가 404가 나고 브라우저에는
+# "missing required error components, refreshing..." 만 뜬다. 실제로 겪은 사고라
+# 여기서 먼저 막는다.
+if command -v lsof >/dev/null 2>&1 && lsof -ti tcp:3000 >/dev/null 2>&1; then
+  echo ""
+  echo "ℹ️  서버가 이미 켜져 있습니다. 창을 하나 더 띄우지 않겠습니다."
+  echo "   (한 번 더 실행하면 돌아가던 서버가 망가집니다)"
+  echo ""
+  echo "   브라우저를 열어드릴게요 →  http://localhost:3000"
+  echo ""
+  echo "   서버를 완전히 새로 시작하려면:"
+  echo "   1) 서버가 돌고 있는 터미널 창에서 Control + C"
+  echo "   2) 그 다음 start.command 를 다시 더블클릭"
+  echo ""
+  open "http://localhost:3000"
+  read -r "?엔터를 누르면 이 창이 닫힙니다..."
+  exit 0
+fi
+
 # 손상된 빌드 캐시로 인한 실행 실패를 방지 (몇 초 걸리지만 항상 깨끗하게 시작)
 rm -rf .next
 
