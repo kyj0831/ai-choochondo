@@ -42,16 +42,31 @@ echo "  AI 추천도 진단 — 업데이트"
 echo "═══════════════════════════════════════════════"
 
 # ── 1. 돌아가는 서버 끄기 ───────────────────────────────────────
-if command -v lsof >/dev/null 2>&1; then
-  PIDS=$(lsof -ti tcp:3000 2>/dev/null)
-  if [ -n "$PIDS" ]; then
-    echo ""
-    echo "▸ 켜져 있는 서버를 끕니다..."
-    echo "$PIDS" | xargs kill 2>/dev/null
-    sleep 2
-    PIDS=$(lsof -ti tcp:3000 2>/dev/null)
-    [ -n "$PIDS" ] && echo "$PIDS" | xargs kill -9 2>/dev/null
-  fi
+# 반드시 "죽었는지 확인"까지 해야 한다. 예전 서버가 남은 채로 코드만 바뀌면
+# 그 서버는 사라진 파일을 계속 붙들고 있어서 모든 페이지가 404가 된다.
+# 실제로 겪은 증상이다.
+free_port_3000() {
+  command -v lsof >/dev/null 2>&1 || return 0
+  local tries=0 pids
+  while true; do
+    pids=$(lsof -ti tcp:3000 2>/dev/null)
+    [ -z "$pids" ] && return 0
+    tries=$((tries + 1))
+    [ "$tries" -gt 12 ] && return 1
+    # 처음 세 번은 정상 종료를 요청하고, 그래도 안 죽으면 강제 종료한다.
+    if [ "$tries" -le 3 ]; then
+      echo "$pids" | xargs kill 2>/dev/null
+    else
+      echo "$pids" | xargs kill -9 2>/dev/null
+    fi
+    sleep 1
+  done
+}
+
+if command -v lsof >/dev/null 2>&1 && [ -n "$(lsof -ti tcp:3000 2>/dev/null)" ]; then
+  echo ""
+  echo "▸ 켜져 있는 서버를 끕니다..."
+  free_port_3000 || fail "돌아가는 서버를 끄지 못했습니다. 맥을 다시 시작한 뒤 이 파일을 다시 실행해주세요."
 fi
 
 # ── 2. 최신 코드 내려받기 ───────────────────────────────────────
@@ -122,4 +137,7 @@ echo "✅ 업데이트가 끝났습니다."
 echo ""
 echo "이어서 서버를 켭니다. 이 창은 끄지 마세요 (끄면 서버도 꺼집니다)."
 echo ""
+# start.command는 포트가 사용 중이면 "이미 켜져 있다"고 보고 그냥 넘어간다.
+# 그 사이 예전 서버가 되살아났다면 여기서 다시 정리해야 새 코드로 켜진다.
+free_port_3000 || fail "돌아가는 서버를 끄지 못했습니다. 맥을 다시 시작한 뒤 이 파일을 다시 실행해주세요."
 exec zsh ./start.command
