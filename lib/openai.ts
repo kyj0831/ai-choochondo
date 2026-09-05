@@ -80,6 +80,49 @@ export function getAnthropic(): Anthropic {
  * 크레딧 소진·키 오류처럼 재시도로 해결되지 않는 문제를 "다시 시도해주세요"로
  * 뭉개면 사용자가 원인을 알 수 없어 무한 재시도하게 된다.
  */
+/**
+ * 401이 났을 때 "왜"까지 화면에서 바로 알 수 있게 저장된 키의 생김새를 진단한다.
+ *
+ * 비개발자 사용자에게 "키를 확인하세요"는 아무 정보가 아니다. 실제로 겪은
+ * 사고는 대부분 붙여넣기 실수였는데, 키 입력이 화면에 보이지 않으니
+ * 본인은 알 수가 없다. 그래서 앱이 대신 본다.
+ *
+ * 키 전체는 절대 노출하지 않는다 — 앞 11자와 뒤 4자만 보여준다. 그 정도면
+ * OpenAI 대시보드의 키 목록과 눈으로 대조하기에 충분하다.
+ */
+function diagnoseKey(): string {
+  const isAnthropic = getProvider() === "anthropic";
+  const name = isAnthropic ? "ANTHROPIC_API_KEY" : "OPENAI_API_KEY";
+  const issueUrl = isAnthropic
+    ? "https://console.anthropic.com/settings/keys"
+    : "https://platform.openai.com/api-keys";
+  const key = readApiKey(name);
+  if (!key) return `.env.local에 ${name}가 없습니다. '키넣기.command'를 실행하세요.`;
+
+  const masked = `${key.slice(0, 11)}…${key.slice(-4)}`;
+  const where = `(저장된 키: ${masked}, 길이 ${key.length}자)`;
+
+  const prefix = isAnthropic ? "sk-ant-" : "sk-";
+  const occurrences = key.split(prefix).length - 1;
+  if (occurrences > 1) {
+    return (
+      `${where} 키 안에 '${prefix}'가 ${occurrences}번 들어 있습니다 — 키가 두 번 붙여넣어졌습니다. ` +
+      `키 입력은 화면에 보이지 않아서 Command+V를 여러 번 누르면 이렇게 됩니다. ` +
+      `'키넣기.command'를 다시 실행하고 Command+V는 한 번만 누르세요.`
+    );
+  }
+  if (!key.startsWith(prefix)) {
+    return `${where} 키가 '${prefix}'로 시작하지 않습니다 — 다른 값이 들어갔습니다. '키넣기.command'로 다시 넣으세요.`;
+  }
+  if (key.length < 40) {
+    return `${where} 키가 너무 짧습니다 — 복사가 중간에 잘렸습니다. '키넣기.command'로 다시 넣으세요.`;
+  }
+  return (
+    `${where} 키 형식 자체는 정상이니, 이 키가 폐기(revoke)됐을 가능성이 높습니다. ` +
+    `${issueUrl} 에서 목록의 키와 위 값을 대조해 보고, 없으면 새로 발급받아 '키넣기.command'로 넣으세요.`
+  );
+}
+
 export function describeLlmError(e: unknown): string {
   const err = e as { status?: number; code?: string; error?: { code?: string }; message?: string };
   const code = err?.code || err?.error?.code || "";
@@ -89,7 +132,7 @@ export function describeLlmError(e: unknown): string {
     return `${getProvider() === "anthropic" ? "Anthropic" : "OpenAI"} API 크레딧이 소진되어 판정을 실행할 수 없습니다. 결제 잔액을 충전하거나, .env.local에 MOCK_LLM=1을 설정해 데모 모드로 진행하세요.`;
   }
   if (status === 401 || code === "invalid_api_key") {
-    return "API 키가 유효하지 않습니다. .env.local의 키를 확인하세요.";
+    return `API 키가 유효하지 않습니다 (401). ${diagnoseKey()}`;
   }
   if (status === 429) {
     return "API 호출 한도(rate limit)에 걸렸습니다. 잠시 후 다시 시도하세요.";
