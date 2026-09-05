@@ -55,6 +55,27 @@ recommend / situational / compare 질문은 **AI가 답할 때 특정 업체·�
 - "OO 분야에서 유명한 사람 알려줘"
 - "국내 OO 업체 중 어디가 괜찮아?"
 
+## 절대 규칙 3 — 추천 질문에는 지역과 "이름을 대라"는 요구가 둘 다 있어야 한다
+지역이 없으면 AI가 세계 기준으로 답하거나 일반론으로 빠진다.
+이름을 요구하지 않으면 AI가 업종·카테고리만 나열하고 끝낸다. 둘 다 실측이 불가능해진다.
+
+실제로 실패한 사례다(빽다방 진단):
+- "디저트가 필요한데 어디에 가면 좋을까?"
+  → 답: "1. 카페: 다양한 케이크, 파이, 쿠키 등을 제공하는 카페가 많습니다"
+  → 카테고리만 답했다. 어떤 브랜드도 등장할 수 없어 측정 불가.
+- "직장인들이 자주 가는 커피숍은 어디야?"
+  → 답: "편리한 위치와 쾌적한 분위기, 다양한 메뉴를 갖춘 곳이 많습니다"
+  → 조건 설명만 답했다. 측정 불가.
+같은 진단에서 유일하게 성공한 질문:
+- "커피를 좋아하는 사람들에게 인기 있는 프랜차이즈는 어디야?"
+  → 답: "1. 스타벅스 - 전 세계적으로 유명한 커피 전문점으로…"
+  → 브랜드명이 나열됐다. 측정 가능.
+
+그러므로 recommend / situational 질문은 반드시:
+1. 지역을 문장 안에 넣어라(예: "국내", "한국에서", 또는 주어진 region).
+2. 이름을 요구하는 표현을 넣어라 — "브랜드", "프랜차이즈", "업체", "회사", "가게 이름",
+   "누구", "어느 브랜드" 등. 개인 대상이면 "누가", "어떤 강사" 같은 표현을 쓴다.
+
 ## 타입별 지시
 - "direct" — 정확히 3개. **브랜드명 필수 포함.** 브랜드 자체를 묻는 질문
   (예: "OO는 어떤 곳이야?", "OO에 대해 알려줘", "OO 어디에 있어?")
@@ -90,7 +111,7 @@ categories: ${input.categories.join(", ") || "(미지정)"}
 audiences: ${input.audiences.join(", ") || "(미지정)"}`;
 
   const result = await callJSON<{ queries: GeneratedQuery[] }>(system, user);
-  return ensureQueryCounts(result.queries ?? [], input);
+  return ensureQueryCounts(result.queries ?? [], input).map((q) => anchorNameDemand(q, input));
 }
 
 /** 타입별 목표 개수. 표본이 15개 이상이어야 신뢰도 배지가 "높음"이 된다. */
@@ -108,6 +129,42 @@ const TARGET_COUNTS: Partial<Record<QueryType, number>> = {
  * 스스로 중복 제거해 줄여버린다. 표본 수는 신뢰도 배지와 커버리지 점수에
  * 직접 영향을 주므로 코드에서 보장한다.
  */
+
+/**
+ * 답변에 고유명사를 요구하는 표현. 하나라도 있으면 이미 측정 가능한 질문으로 본다.
+ *
+ * "기업", "회사", "가게"는 일부러 뺐다. "기업 AI 교육이 필요한데…"처럼 수식어로도
+ * 쓰여서, 이름을 요구하지 않는 질문까지 통과시킨다. 애매하면 통과시키지 않는 쪽이 낫다 —
+ * 이미 충분한 질문에 요구 문장이 한 번 더 붙는 건 무해하지만, 못 걸러낸 질문은
+ * 답변에 브랜드가 아예 없어 그 문항이 통째로 0점이 된다.
+ */
+const NAME_DEMAND_RE = /브랜드|프랜차이즈|업체|매장|전문점|상호|이름|누구|누가/;
+
+/**
+ * 추천 질문이 "이름을 대라"고 요구하지 않으면 요구 문장을 하나 덧붙인다.
+ *
+ * 프롬프트로만 지시하면 모델이 자주 어긴다. 실제 빽다방 진단에서 추천 질문 6개 중
+ * 5개가 "디저트가 필요한데 어디에 가면 좋을까?" 같은 형태로 나왔고, ChatGPT는
+ * "1. 카페: 다양한 케이크를 제공하는 카페가 많습니다"라고 카테고리만 답했다.
+ * 어떤 브랜드도 등장할 수 없는 답이라 30점짜리 추천 축이 통째로 0점이 됐다.
+ *
+ * 원문을 고치지 않고 문장을 뒤에 덧붙이는 방식이라 한국어 문법이 깨지지 않는다.
+ */
+export function anchorNameDemand(q: GeneratedQuery, input: GenerateQueriesInput): GeneratedQuery {
+  if (q.type !== "recommend" && q.type !== "situational" && q.type !== "compare") return q;
+  if (NAME_DEMAND_RE.test(q.text)) return q;
+
+  const where = /대한민국|한국/.test(input.region) ? "국내" : input.region;
+  const hasRegion = q.text.includes(where) || /국내|한국/.test(q.text);
+  const scope = hasRegion ? "" : `${where} `;
+  const demand =
+    input.entityType === "개인 브랜드/강사"
+      ? `${scope}사람 이름으로 3명 알려줘.`
+      : `${scope}브랜드·업체 이름으로 3곳 알려줘.`;
+
+  return { ...q, text: `${q.text.trim()} ${demand}` };
+}
+
 export function ensureQueryCounts(
   generated: GeneratedQuery[],
   input: GenerateQueriesInput

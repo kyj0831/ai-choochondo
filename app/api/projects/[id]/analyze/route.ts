@@ -3,6 +3,7 @@ import { getProject, listAssets, listEvidence, listFacts, listQueries, saveRepor
 import { computeScores } from "@/lib/scoring";
 import { assembleReportJSON, generateReportNarrative } from "@/lib/llm";
 import { EntityType } from "@/lib/types";
+import { describeLlmError } from "@/lib/openai";
 
 // Compute deterministic 5-axis scores, then ask the LLM to write the narrative
 // portions (findings, actions, copy) grounded in those scores. FR-032/033/040/042.
@@ -71,7 +72,8 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     updateProjectStatus(params.id, "analyzed");
     return NextResponse.json({ report });
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : "리포트 생성 중 오류가 발생했습니다.";
+    // 원인(401·크레딧 소진 등)을 한국어 조치사항으로 바꿔서 내보낸다.
+    const message = e instanceof Error ? describeLlmError(e) : "리포트 생성 중 오류가 발생했습니다.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -44,7 +44,7 @@ PROBLEM=0
 
 COUNT=$(printf '%s' "$KEY" | grep -o 'sk-' | wc -l | tr -d ' ')
 if [ "$COUNT" -gt 1 ]; then
-  echo "🚨 키 안에 'sk-'가 ${COUNT}번 들어 있습니다 — 키가 두 번 붙여넣어졌습니다."
+  echo "🚨 키 안에 'sk-'가 ${COUNT}번 들어 있습니다 — 키가 ${COUNT}번 이어붙어 저장됐습니다."
   echo "   입력이 화면에 안 보여서 Command+V를 여러 번 누르면 이렇게 됩니다."
   echo "   → '키넣기.command'를 다시 실행하고 Command+V는 딱 한 번만 누르세요."
   PROBLEM=1
