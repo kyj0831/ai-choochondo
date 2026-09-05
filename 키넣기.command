@@ -15,6 +15,8 @@ fi
 
 # 인자: 1=env변수명, 2=사람이 읽는 이름, 3=발급 페이지, 4=키 접두사(형식 검증용)
 set_key() {
+  # [[:space:]]## (1회 이상) 패턴을 쓰기 위해 이 함수 안에서만 확장 글로브를 켠다.
+  setopt localoptions extendedglob
   local VARNAME="$1"
   local LABEL="$2"
   local URL="$3"
@@ -31,11 +33,26 @@ set_key() {
   read -s "KEY?$LABEL 키 붙여넣기 > "
   echo ""
 
-  KEY="${KEY## }"
-  KEY="${KEY%% }"
+  # 앞뒤 공백을 모두 턴다(붙여넣기 때 공백·탭이 섞여 들어오는 일이 흔하다).
+  KEY="${KEY##[[:space:]]##}"
+  KEY="${KEY%%[[:space:]]##}"
+  # "OPENAI_API_KEY=sk-..." 처럼 줄 전체를 붙여넣은 경우 변수명을 떼어낸다.
+  KEY="${KEY#${VARNAME}=}"
+  KEY="${KEY##[[:space:]]##}"
+  # 따옴표로 감싸 붙여넣은 경우도 벗긴다.
+  KEY="${KEY#\"}"; KEY="${KEY%\"}"
+  KEY="${KEY#\'}"; KEY="${KEY%\'}"
 
   if [ -z "$KEY" ]; then
     echo "→ 건너뜁니다."
+    return
+  fi
+
+  # 예시 문구(sk-... 같은 자리표시자)를 진짜 키로 저장하면, 앱이 키가 있다고
+  # 착각해 실제 호출을 시도하다 401 Incorrect API key 로 죽는다. 아예 막는다.
+  if [[ "$KEY" == *"..."* || ${#KEY} -lt 20 ]]; then
+    echo "❌ 이건 실제 키가 아니라 예시 문구로 보입니다 (또는 너무 짧습니다)."
+    echo "   저장하지 않고 건너뜁니다. 발급 페이지에서 받은 긴 문자열을 붙여넣어 주세요."
     return
   fi
 
