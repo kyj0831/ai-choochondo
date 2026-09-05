@@ -106,7 +106,7 @@ function diagnoseKey(): string {
   const occurrences = key.split(prefix).length - 1;
   if (occurrences > 1) {
     return (
-      `${where} 키 안에 '${prefix}'가 ${occurrences}번 들어 있습니다 — 키가 두 번 붙여넣어졌습니다. ` +
+      `${where} 키 안에 '${prefix}'가 ${occurrences}번 들어 있습니다 — 키가 ${occurrences}번 이어붙어 저장됐습니다. ` +
       `키 입력은 화면에 보이지 않아서 Command+V를 여러 번 누르면 이렇게 됩니다. ` +
       `'키넣기.command'를 다시 실행하고 Command+V는 한 번만 누르세요.`
     );

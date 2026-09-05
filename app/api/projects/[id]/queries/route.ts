@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { clearSystemQueries, getProject, insertQueries, listQueries, updateProjectStatus } from "@/lib/repo";
 import { generateQueries } from "@/lib/llm";
+import { describeLlmError } from "@/lib/openai";
 import { EntityType } from "@/lib/types";
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
@@ -41,7 +42,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     updateProjectStatus(params.id, "queries");
     return NextResponse.json({ queries: rows });
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : "질문 생성 중 오류가 발생했습니다.";
+    // describeLlmError를 거쳐야 401·크레딧 소진 같은 원인이 한국어 조치사항으로 나온다.
+    // 원문 메시지를 그대로 내보내면 화면에 영어 스택이 뜨고 사용자는 손쓸 방법이 없다.
+    const message = e instanceof Error ? describeLlmError(e) : "질문 생성 중 오류가 발생했습니다.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
