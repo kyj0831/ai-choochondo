@@ -31,7 +31,7 @@ echo "════════════════════════�
 echo "  AI 추천도 진단 — 새로 설치"
 echo "═══════════════════════════════════════════════"
 echo ""
-echo "기존 폴더는 건드리지 않습니다. 바탕화면에 새 폴더를 만들어 설치하고,"
+echo "기존 폴더는 건드리지 않습니다. 내려받기 폴더에 새 폴더를 만들어 설치하고,"
 echo "API 키와 지금까지의 진단 결과만 가져옵니다."
 
 # ── 1. 돌아가는 서버 끄기 ───────────────────────────────────────
@@ -88,10 +88,13 @@ else
 fi
 
 # ── 3. 새 폴더 만들기 ───────────────────────────────────────────
-DEST="$HOME/Desktop/ai-choochondo"
+# 내려받기 폴더에 만든다. 바탕화면은 아이콘이 많으면 새 폴더가 파묻혀
+# 보이지 않는다는 이야기가 실제로 나왔다. 사용자가 늘 여는 곳에 둔다.
+# 이름은 기존 "ai-choochondo 4"와 헷갈리지 않게 -NEW 를 붙인다.
+DEST="$HOME/Downloads/ai-choochondo-NEW"
 n=2
 while [ -e "$DEST" ]; do
-  DEST="$HOME/Desktop/ai-choochondo-$n"
+  DEST="$HOME/Downloads/ai-choochondo-NEW-$n"
   n=$((n + 1))
 done
 
@@ -144,10 +147,14 @@ npm install || fail "준비물 설치에 실패했습니다. 인터넷 연결을
 echo ""
 echo "✅ 새로 설치가 끝났습니다."
 echo ""
-echo "   위치: $DEST  (바탕화면)"
+echo "   위치: $DEST"
 echo "   앞으로는 이 폴더의 파일들을 쓰시면 됩니다."
+echo ""
+echo "▸ 그 폴더를 Finder로 열어드립니다 (찾지 않으셔도 됩니다)."
+open "$DEST" 2>/dev/null
 if [ -n "$OLD" ] && [ "$OLD" != "$DEST" ]; then
-  echo "   예전 폴더($OLD)는 잘 되는 걸 확인한 뒤 지우셔도 됩니다."
+  echo "   예전 폴더는 잘 되는 걸 확인한 뒤 지우셔도 됩니다:"
+  echo "   $OLD"
 fi
 echo ""
 exec zsh ./start.command
