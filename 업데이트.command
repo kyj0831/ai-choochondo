@@ -23,6 +23,57 @@ done
 
 REPO_ZIP="https://codeload.github.com/kyj0831/ai-choochondo/zip/refs/heads/main"
 SELF="$(basename "$0")"
+
+# ── 이 파일이 올바른 폴더에 있는지 먼저 확인한다 ────────────────────
+# start.command 옆이 아니라 Downloads 바로 아래 같은 곳에 두면, 그 자리를
+# 프로젝트 폴더로 착각해 엉뚱한 곳에 코드를 풀어놓고 키도 없이 돌아간다.
+# 실제로 "파일을 어디에 넣어야 하는지"에서 막히는 일이 반복돼서 여기서 잡는다.
+if [ ! -f ./start.command ] || [ ! -f ./package.json ]; then
+  echo ""
+  echo "▸ 여기는 진단 프로그램 폴더가 아니네요. 올바른 폴더를 찾아봅니다..."
+  echo "  (지금 위치: $(pwd))"
+
+  CANDIDATES=()
+  for base in "$HOME/Downloads" "$HOME/Desktop" "$HOME/Documents" "$HOME"; do
+    [ -d "$base" ] || continue
+    while IFS= read -r hit; do
+      dir="${hit:h}"
+      [ -f "$dir/package.json" ] || continue
+      # 같은 폴더가 여러 번 잡히지 않게 거른다.
+      [[ " ${CANDIDATES[*]} " == *" $dir "* ]] || CANDIDATES+=("$dir")
+    done < <(find "$base" -maxdepth 4 -name start.command -not -path '*/node_modules/*' 2>/dev/null)
+  done
+
+  if [ ${#CANDIDATES[@]} -eq 0 ]; then
+    echo ""
+    echo "❌ 진단 프로그램 폴더를 찾지 못했습니다."
+    echo ""
+    echo "   이 파일은 'start.command' 가 같이 보이는 폴더에 넣어야 합니다."
+    echo "   압축을 아직 안 푸셨다면 zip 파일을 먼저 풀어주세요."
+    echo ""
+    read -r "?엔터를 누르면 창이 닫힙니다..."
+    exit 1
+  fi
+
+  if [ ${#CANDIDATES[@]} -gt 1 ]; then
+    echo ""
+    echo "❌ 후보 폴더가 여러 개입니다. 어느 것인지 제가 고를 수 없습니다."
+    echo ""
+    for d in $CANDIDATES; do echo "   · $d"; done
+    echo ""
+    echo "   이 파일을 위 폴더 중 실제로 쓰시는 곳으로 옮긴 뒤 다시 더블클릭해주세요."
+    echo ""
+    read -r "?엔터를 누르면 창이 닫힙니다..."
+    exit 1
+  fi
+
+  TARGET="${CANDIDATES[1]}"
+  echo "  → 찾았습니다: $TARGET"
+  echo "  → 이 파일을 그 폴더로 옮기고 계속합니다."
+  cp -f "$0" "$TARGET/$SELF" 2>/dev/null
+  chmod +x "$TARGET/$SELF" 2>/dev/null
+  cd "$TARGET" || { echo "❌ 폴더로 이동하지 못했습니다."; read -r "?엔터..."; exit 1; }
+fi
 # 업데이트로 날아가면 안 되는 것들: 키, 진단 데이터, 설치된 패키지, 빌드 캐시,
 # 그리고 지금 실행 중인 이 스크립트 자신.
 KEEP=(".env.local" "data" "node_modules" ".next" "$SELF")
