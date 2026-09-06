@@ -94,15 +94,52 @@ set_key "GEMINI_API_KEY" "Google Gemini (선택)" "https://aistudio.google.com/a
 
 echo ""
 echo "저장 위치: $(pwd)/.env.local (이 파일은 깃헙에 올라가지 않습니다)"
+# ── 서버 다시 켜기 ─────────────────────────────────────────────
+# 키를 저장해도 이미 돌고 있는 서버는 예전 키를 그대로 쓴다. 여기서 직접
+# 껐다 켠다 — "서버 창에서 Control+C 하세요"에서 막히는 일이 반복돼서다.
+free_port_3000() {
+  command -v lsof >/dev/null 2>&1 || return 0
+  local tries=0 pids
+  while true; do
+    pids=$(lsof -ti tcp:3000 2>/dev/null)
+    [ -z "$pids" ] && return 0
+    tries=$((tries + 1))
+    [ "$tries" -gt 12 ] && return 1
+    if [ "$tries" -le 3 ]; then
+      echo "$pids" | xargs kill 2>/dev/null
+    else
+      echo "$pids" | xargs kill -9 2>/dev/null
+    fi
+    sleep 1
+  done
+}
+
 echo ""
 echo "═══════════════════════════════════════════════"
-echo "  다음 단계"
+echo "  서버를 새 키로 다시 켭니다"
 echo "═══════════════════════════════════════════════"
+
+if command -v lsof >/dev/null 2>&1 && [ -n "$(lsof -ti tcp:3000 2>/dev/null)" ]; then
+  echo ""
+  echo "▸ 예전 키로 돌고 있던 서버를 끕니다..."
+  if ! free_port_3000; then
+    echo ""
+    echo "⚠️  돌아가는 서버를 끄지 못했습니다."
+    echo "   맥을 다시 시작한 뒤 start.command 를 더블클릭해주세요."
+    read -r "?엔터를 누르면 창이 닫힙니다..."
+    exit 1
+  fi
+fi
+
+if [ ! -f ./start.command ]; then
+  echo ""
+  echo "⚠️  start.command 를 찾을 수 없습니다. 같은 폴더의 start.command 를 직접 더블클릭해주세요."
+  read -r "?엔터를 누르면 창이 닫힙니다..."
+  exit 1
+fi
+
 echo ""
-echo "  1. 서버가 켜져 있으면 그 창에서 Control + C 로 끄세요"
-echo "  2. start.command 를 더블클릭하세요"
-echo "  3. '✅ API 키가 확인되었습니다' 가 뜨면 성공입니다"
-echo "  4. 증거 수집 화면에서 '엔진 연결 상태'에 방금 넣은 키가 ● 로 표시되는지 확인하세요"
-echo "  5. '자동 수집' 버튼으로 진단하면 근거 부록에 출처가 채워집니다"
+echo "  '✅ API 키가 확인되었습니다' 가 뜨면 성공입니다."
+echo "  이 창은 끄지 마세요 — 끄면 서버도 꺼집니다."
 echo ""
-read -r "?엔터를 누르면 창이 닫힙니다..."
+exec zsh ./start.command
