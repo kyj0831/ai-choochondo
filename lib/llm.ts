@@ -774,6 +774,15 @@ export function assembleReportJSON(params: {
     ai_perception: params.narrative.ai_perception,
     search_gaps: params.narrative.search_gaps,
     recheck_checklist: params.narrative.recheck_checklist,
-    limitations: params.narrative.limitations,
+    // 한계 고지는 모델에게 쓰게 하지 않는다. gpt-4o 가 "이 리포트는 2023년 10월까지의
+    // 데이터를 기반으로 작성되었습니다"라고 자기 학습 시점을 지어내 고객 리포트
+    // 푸터에 찍힌 적이 있다. 실제 관측값(표본·엔진 수·실패율)으로만 만든다.
+    limitations: [
+      `질문 ${params.sampleSize}개 · 엔진 ${params.engineCount}종 · 수집 실패율 ${params.failureRate}% 로 관측한 결과입니다.`,
+      params.engineCount < 2
+        ? "엔진이 하나뿐이라 그 모델의 성향이 점수에 그대로 반영됩니다. 다른 엔진을 추가해 교차 확인하세요."
+        : "엔진별로 답이 다를 수 있어, 특정 엔진 결과만으로 판단하지 마세요.",
+      "생성형 AI 답변은 시점·표현에 따라 달라집니다. 절대 순위가 아니라 관측 시점의 지표입니다.",
+    ],
   };
 }
