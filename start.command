@@ -70,7 +70,26 @@ else
   echo "✅ API 키가 확인되었습니다 — 실제 AI 진단 모드로 실행합니다."
 fi
 
-echo "🚀 서버를 시작합니다. 브라우저에서 http://localhost:3000 을 여세요."
+echo "🚀 서버를 시작합니다. 처음 켤 때는 20~30초 걸립니다."
+echo "   준비가 끝나면 브라우저가 저절로 열립니다. 이 창은 끄지 마세요."
 echo "   (종료하려면 이 창에서 Ctrl+C)"
-sleep 2 && open "http://localhost:3000" &
+
+# 서버가 실제로 응답할 때까지 기다렸다 연다.
+#
+# 예전에는 2초 뒤 무조건 열었는데, Next.js는 처음 켜질 때 20~30초가 걸린다.
+# 준비도 안 된 서버에 브라우저가 붙으면 "사이트에 연결할 수 없음"이 뜨거나,
+# 예전 화면이 남아 있던 탭이 사라진 파일을 찾다가
+# "missing required error components, refreshing..." 로 멈춰버린다.
+(
+  for _ in {1..120}; do
+    if curl -s -o /dev/null -m 2 "http://localhost:3000"; then
+      open "http://localhost:3000"
+      exit 0
+    fi
+    sleep 1
+  done
+  echo ""
+  echo "⚠️  서버가 2분 안에 준비되지 않았습니다. 브라우저에서 직접 http://localhost:3000 을 열어보세요."
+) &
+
 npm run dev
