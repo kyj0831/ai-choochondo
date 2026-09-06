@@ -72,12 +72,22 @@ if [ ${#CANDIDATES[@]} -eq 0 ]; then
 fi
 
 # 지금 서버가 어느 폴더에서 돌고 있는지 알아낸다.
+# 검색 범위 밖(예: 홈 폴더 바로 아래)에서 돌고 있어도 놓치면 안 되므로 후보에 넣는다.
 SERVER_DIR=""
 if command -v lsof >/dev/null 2>&1; then
   for pid in $(lsof -ti tcp:3000 2>/dev/null); do
     d=$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -1)
     [ -n "$d" ] && { SERVER_DIR="$d"; break; }
   done
+fi
+if [ -n "$SERVER_DIR" ]; then
+  echo ""
+  echo "  🔎 지금 서버가 돌고 있는 폴더: ${SERVER_DIR/#$HOME/~}"
+  echo "     그 폴더의 키: $(mask "$(read_key_from "$SERVER_DIR/.env.local")")"
+  echo "     (브라우저의 401 에 찍힌 끝자리가 이것과 같으면, 브라우저는 이 서버를 보고 있던 겁니다)"
+  if [ -f "$SERVER_DIR/package.json" ]; then
+    [[ " ${CANDIDATES[*]} " == *" $SERVER_DIR "* ]] || CANDIDATES+=("$SERVER_DIR")
+  fi
 fi
 
 echo ""
@@ -110,7 +120,29 @@ fi
 
 cd "$TARGET" || { echo "❌ 폴더로 이동하지 못했습니다."; pause_exit 1; }
 
-# ── 2. 실행 권한 복구 ───────────────────────────────────────────
+# ── 2. 예전 서버 먼저 끄기 ──────────────────────────────────────
+# 키를 묻기 전에 끈다. 뒤에서 키 입력이 실패하더라도, 예전 키로 도는 서버가
+# 남아서 브라우저에 예전 오류를 계속 보여주며 사람을 헷갈리게 하는 일은 없어야 한다.
+free_port_3000() {
+  command -v lsof >/dev/null 2>&1 || return 0
+  local tries=0 pids
+  while true; do
+    pids=$(lsof -ti tcp:3000 2>/dev/null)
+    [ -z "$pids" ] && return 0
+    tries=$((tries + 1)); [ "$tries" -gt 12 ] && return 1
+    if [ "$tries" -le 3 ]; then echo "$pids" | xargs kill 2>/dev/null
+    else echo "$pids" | xargs kill -9 2>/dev/null; fi
+    sleep 1
+  done
+}
+if [ -n "$SERVER_DIR" ] || { command -v lsof >/dev/null 2>&1 && [ -n "$(lsof -ti tcp:3000 2>/dev/null)" ]; }; then
+  echo ""
+  echo "▸ 예전 서버를 끕니다..."
+  free_port_3000 || { echo "⚠️  서버를 끄지 못했습니다. 맥을 다시 시작한 뒤 이 파일을 다시 실행해 주세요."; pause_exit 1; }
+  echo "  → 껐습니다. (이제 브라우저는 '연결할 수 없음'이 뜹니다 — 새로 켜질 때까지 정상입니다)"
+fi
+
+# ── 3. 실행 권한 복구 ───────────────────────────────────────────
 echo ""
 echo "▸ .command 파일들의 실행 권한을 되돌립니다..."
 for f in ./*.command(N); do
@@ -119,7 +151,7 @@ for f in ./*.command(N); do
 done
 echo "  → 완료"
 
-# ── 3. 코드가 옛날 것이면 최신으로 ─────────────────────────────
+# ── 4. 코드가 옛날 것이면 최신으로 ─────────────────────────────
 if ! is_latest_code "$TARGET"; then
   echo ""
   echo "▸ 이 폴더의 코드가 옛날 것입니다. 깃헙에서 최신으로 바꿉니다 (키·데이터는 그대로)..."
@@ -149,7 +181,7 @@ if ! is_latest_code "$TARGET"; then
   rm -rf "$TMP"
 fi
 
-# ── 4. 키 검증 — 안 되면 그 자리에서 새 키 받기 ─────────────────
+# ── 5. 키 검증 — 안 되면 그 자리에서 새 키 받기 ─────────────────
 # 0=유효, 1=거부(401), 2=인터넷/기타
 check_key() {
   local code
@@ -217,38 +249,23 @@ echo "▸ 저장된 키를 OpenAI에 직접 확인합니다..."
 CUR=$(read_key_from .env.local)
 if [ -z "$CUR" ]; then
   echo "  → 저장된 키가 없습니다."
-  ask_new_key || { echo ""; echo "❌ 유효한 키를 받지 못했습니다. 키를 새로 발급받아 다시 실행해 주세요."; pause_exit 1; }
+  ask_new_key || { echo ""; echo "❌ 유효한 키를 받지 못했습니다. 예전 서버는 이미 껐습니다."; echo "   platform.openai.com 에서 키를 새로 만들어 복사한 직후, 이 파일을 다시 더블클릭해 주세요."; pause_exit 1; }
 else
   check_key "$CUR"; rc=$?
   if [ $rc -eq 0 ]; then
     echo "  ✅ 저장된 키가 유효합니다: $(mask "$CUR")"
   elif [ $rc -eq 1 ]; then
     echo "  ❌ 저장된 키 $(mask "$CUR") 는 OpenAI에서 폐기된 키입니다."
-    ask_new_key || { echo ""; echo "❌ 유효한 키를 받지 못했습니다. 키를 새로 발급받아 다시 실행해 주세요."; pause_exit 1; }
+    ask_new_key || { echo ""; echo "❌ 유효한 키를 받지 못했습니다. 예전 서버는 이미 껐습니다."; echo "   platform.openai.com 에서 키를 새로 만들어 복사한 직후, 이 파일을 다시 더블클릭해 주세요."; pause_exit 1; }
   else
     echo "  ⚠️  인터넷 연결을 확인할 수 없어 키 검증을 건너뜁니다."
   fi
 fi
 
-# ── 5. 예전 서버 끄고 새로 켜기 ─────────────────────────────────
-free_port_3000() {
-  command -v lsof >/dev/null 2>&1 || return 0
-  local tries=0 pids
-  while true; do
-    pids=$(lsof -ti tcp:3000 2>/dev/null)
-    [ -z "$pids" ] && return 0
-    tries=$((tries + 1)); [ "$tries" -gt 12 ] && return 1
-    if [ "$tries" -le 3 ]; then echo "$pids" | xargs kill 2>/dev/null
-    else echo "$pids" | xargs kill -9 2>/dev/null; fi
-    sleep 1
-  done
-}
-if command -v lsof >/dev/null 2>&1 && [ -n "$(lsof -ti tcp:3000 2>/dev/null)" ]; then
-  echo ""
-  echo "▸ 예전 서버를 끕니다..."
-  free_port_3000 || { echo "⚠️  서버를 끄지 못했습니다. 맥을 다시 시작한 뒤 이 파일을 다시 실행해 주세요."; pause_exit 1; }
-  echo "  → 껐습니다"
-fi
+# ── 6. 새로 켜기 (예전 서버는 이미 2단계에서 껐다) ───────────────
+# 켜기 직전에 한 번 더 확인한다. 그 사이 되살아났으면 start.command 가
+# "이미 켜져 있다"고 보고 그냥 넘어가 버린다.
+free_port_3000 || { echo "⚠️  서버를 끄지 못했습니다. 맥을 다시 시작한 뒤 이 파일을 다시 실행해 주세요."; pause_exit 1; }
 
 [ -f ./start.command ] || { echo "❌ start.command 가 없습니다."; pause_exit 1; }
 echo ""
