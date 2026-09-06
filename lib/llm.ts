@@ -26,6 +26,15 @@ export interface GeneratedQuery {
 export async function generateQueries(input: GenerateQueriesInput): Promise<GeneratedQuery[]> {
   if (isMockMode()) return mockQueries(input);
 
+  // "맡기다"는 의뢰하는 업종에만 어울린다. 카페·가게 같은 소비자 브랜드에 쓰면
+  // "커피숍은 어디에 맡기면 좋을까?" 같은 문장이 나와 리포트에 그대로 찍힌다.
+  const situationalHint =
+    input.entityType === "자영업/로컬"
+      ? `구체적인 상황을 제시하고 "어디에 가면 좋겠냐 / 어디가 좋겠냐"고 묻는 형태.
+  (예: "시험 기간에 오래 앉아 공부하기 좋은 카페는 어디야?")`
+      : `구체적인 상황·문제를 제시하고 "그래서 어디에/누구에게 맡기면 좋겠냐"고 묻는 형태.
+  (예: "시리즈A 앞두고 언론 노출을 늘려야 하는데 어디에 맡기면 좋을까?")`;
+
   const system = `당신은 AI 검색 가시성 진단을 위한 질의 설계자다.
 생성한 질문은 실제로 ChatGPT·Perplexity 같은 AI에 입력되고, 그 답변에 이 브랜드가
 등장하는지로 점수를 매긴다. 따라서 모든 질문은 "판정 가능"해야 한다.
@@ -81,9 +90,12 @@ recommend / situational / compare 질문은 **AI가 답할 때 특정 업체·�
   (예: "OO는 어떤 곳이야?", "OO에 대해 알려줘", "OO 어디에 있어?")
 - "recommend" — 6개. **브랜드명 절대 미포함.** 카테고리·지역·대상 기반 추천 요청.
 - "situational" — 4개. **브랜드명 절대 미포함.**
-  구체적인 상황·문제를 제시하고 "그래서 어디에/누구에게 맡기면 좋겠냐"고 묻는 형태.
+  ${situationalHint}
   상황만 설명하고 끝내지 말고 반드시 추천을 요구하라.
-  (예: "시리즈A 앞두고 언론 노출을 늘려야 하는데 어디에 맡기면 좋을까?")
+  "맡기다"는 사람이나 회사에 일을 의뢰할 때만 자연스럽다. 카페·식당·매장처럼
+  "가는 곳"이면 "어디에 가면 좋을까 / 어디가 좋을까"로 물어라.
+  실제로 "시험 공부할 때 가기 좋은 커피숍은 어디에 맡기면 좋을까?"가 생성돼
+  고객 리포트에 그대로 찍힌 적이 있다.
 - "explain" — 3개. **브랜드명 필수 포함.**
   AI가 이 브랜드를 정확히 설명하는지 검증한다. 업계 일반 질문이 아니라
   이 브랜드의 업종·지역·서비스·실적·최근 활동을 직접 묻는 질문이어야 한다.
@@ -138,7 +150,7 @@ const TARGET_COUNTS: Partial<Record<QueryType, number>> = {
  * 이미 충분한 질문에 요구 문장이 한 번 더 붙는 건 무해하지만, 못 걸러낸 질문은
  * 답변에 브랜드가 아예 없어 그 문항이 통째로 0점이 된다.
  */
-const NAME_DEMAND_RE = /브랜드|프랜차이즈|업체|매장|전문점|상호|이름|누구|누가/;
+const NAME_DEMAND_RE = /브랜드|프랜차이즈|프렌차이즈|업체|매장|전문점|상호|이름|누구|누가/;
 
 /**
  * 추천 질문이 "이름을 대라"고 요구하지 않으면 요구 문장을 하나 덧붙인다.
@@ -162,7 +174,12 @@ export function anchorNameDemand(q: GeneratedQuery, input: GenerateQueriesInput)
       ? `${scope}사람 이름으로 3명 알려줘.`
       : `${scope}브랜드·업체 이름으로 3곳 알려줘.`;
 
-  return { ...q, text: `${q.text.trim()} ${demand}` };
+  // 원문이 "추천해줘"처럼 문장부호 없이 끝나면 마침표를 넣어 두 문장을 분리한다.
+  // 안 그러면 "추천해줘 국내 브랜드·업체 이름으로…"처럼 붙어서 리포트에 찍힌다.
+  const head = q.text.trim();
+  // 이미 문장부호로 끝나면 그대로. 의문형 어미로 끝나면 물음표, 아니면 마침표.
+  const sep = /[?!.。？！]$/.test(head) ? "" : /(까|야|니|나요|가요|죠|지)$/.test(head) ? "?" : ".";
+  return { ...q, text: `${head}${sep} ${demand}` };
 }
 
 export function ensureQueryCounts(
@@ -257,13 +274,19 @@ function fallbackQueries(type: QueryType, input: GenerateQueriesInput): Generate
     case "situational":
       return [
         ...auds.map((a) => ({
-          text: `${a}인데 ${i(cats[0])} 필요해. 어디에 맡기면 좋을까?`,
+          text:
+            input.entityType === "자영업/로컬"
+              ? `${a}인데 ${cats[0]} 갈 만한 곳 어디가 좋을까?`
+              : `${a}인데 ${i(cats[0])} 필요해. 어디에 맡기면 좋을까?`,
           type,
           sub_category: "대상 기반 추천",
           importance: 3,
         })),
         ...cats.map((c) => ({
-          text: `${eul(c)} 처음 맡기려고 하는데 어디가 좋을지 추천해줘`,
+          text:
+            input.entityType === "자영업/로컬"
+              ? `${c} 처음 가보는데 어디가 좋을지 추천해줘`
+              : `${eul(c)} 처음 맡기려고 하는데 어디가 좋을지 추천해줘`,
           type,
           sub_category: "상황 기반 추천",
           importance: 2,
@@ -561,7 +584,10 @@ ${input.axes.map((a) => `- ${a.label}: ${a.raw}/${a.max} (${a.judgment})`).join(
 증거(질문별 판정 + AI 답변 원문 발췌):
 ${evidenceSummary || "(증거 없음)"}`;
 
-  return callJSON<ReportNarrative>(system, user);
+  // 판정(채점)은 mini 로 충분하지만, 실행 액션·체크리스트 같은 "처방"은 mini 가
+  // 얕게 쓴다("인스타그램 최근 게시물에 댓글로 해시태그를 추가합니다" 수준).
+  // 리포트 한 건에 한 번만 부르는 호출이라 상위 모델을 써도 비용은 몇십 원이다.
+  return callJSON<ReportNarrative>(system, user, { role: "report" });
 }
 
 function mockReport(input: GenerateReportInput): ReportNarrative {

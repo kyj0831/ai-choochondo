@@ -55,6 +55,12 @@ export function isMockMode(): boolean {
 }
 
 export const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+/**
+ * 리포트 서술(핵심 발견·실행 액션·체크리스트) 전용 모델.
+ * 판정은 mini 로 충분하지만 "처방"은 mini 가 얕게 쓴다. 리포트 한 건당 한 번만
+ * 부르므로 gpt-4o 를 써도 건당 몇십 원이다. 아끼려면 OPENAI_REPORT_MODEL=gpt-4o-mini.
+ */
+export const OPENAI_REPORT_MODEL = process.env.OPENAI_REPORT_MODEL || "gpt-4o";
 export const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-8";
 
 let openaiClient: OpenAI | null = null;
@@ -158,12 +164,16 @@ function extractJSON(text: string): string {
   return candidate.slice(start, end + 1);
 }
 
-export async function callJSON<T>(system: string, user: string): Promise<T> {
+export async function callJSON<T>(
+  system: string,
+  user: string,
+  opts: { role?: "judge" | "report" } = {}
+): Promise<T> {
   const provider = getProvider();
 
   if (provider === "openai") {
     const completion = await getOpenAI().chat.completions.create({
-      model: OPENAI_MODEL,
+      model: opts.role === "report" ? OPENAI_REPORT_MODEL : OPENAI_MODEL,
       temperature: 0.4,
       response_format: { type: "json_object" },
       messages: [
