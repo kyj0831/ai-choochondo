@@ -56,7 +56,10 @@ echo ""
 echo "▸ 기존 폴더를 찾는 중..."
 OLD=""
 BEST=-1
-for base in "$HOME/Downloads" "$HOME/Desktop" "$HOME/Documents" "$HOME"; do
+# macOS는 홈 폴더를 훑으면 사진 보관함·iCloud 접근 권한을 물어본다. 우리는 그런
+# 파일을 읽을 일이 없으므로 검색 범위를 내려받기·바탕화면·문서로만 좁히고,
+# 보관함 경로는 아예 들어가지 않는다. (그래도 물어보면 "허용 안 함"으로 충분하다)
+for base in "$HOME/Downloads" "$HOME/Desktop" "$HOME/Documents"; do
   [ -d "$base" ] || continue
   while IFS= read -r hit; do
     dir="${hit:h}"
@@ -69,7 +72,11 @@ for base in "$HOME/Downloads" "$HOME/Desktop" "$HOME/Documents" "$HOME"; do
       BEST=$score
       OLD="$dir"
     fi
-  done < <(find "$base" -maxdepth 4 -name start.command -not -path '*/node_modules/*' 2>/dev/null)
+  done < <(find "$base" -maxdepth 4 -name start.command \
+      -not -path '*/node_modules/*' \
+      -not -path '*/Library/*' \
+      -not -path '*/Pictures/*' \
+      -not -path '*.photoslibrary/*' 2>/dev/null)
 done
 
 if [ -n "$OLD" ]; then
