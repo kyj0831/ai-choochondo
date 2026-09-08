@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getProject, listAssets, listEvidence, listQueries, saveReport, updateProjectStatus } from "@/lib/repo";
+import { listAssets, listEvidence, listQueries, saveReport, updateProjectStatus } from "@/lib/repo";
+import { requireProject } from "@/lib/owner";
 import { computeScores } from "@/lib/scoring";
 import { assembleReportJSON, generateReportNarrative } from "@/lib/llm";
 import { EntityType } from "@/lib/types";
@@ -7,7 +8,7 @@ import { EntityType } from "@/lib/types";
 // Compute deterministic 5-axis scores, then ask the LLM to write the narrative
 // portions (findings, actions, copy) grounded in those scores. FR-032/033/040/042.
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
-  const project = getProject(params.id);
+  const project = await requireProject(params.id);
   if (!project) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const queries = listQueries(params.id);

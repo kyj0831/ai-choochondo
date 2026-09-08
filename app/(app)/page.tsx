@@ -14,6 +14,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 export default function DashboardPage() {
   const [projects, setProjects] = useState<Project[] | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dbPath, setDbPath] = useState<string | null>(null);
 
@@ -23,7 +24,10 @@ export default function DashboardPage() {
         if (!r.ok) throw new Error(`목록을 불러오지 못했습니다 (HTTP ${r.status}).`);
         return r.json();
       })
-      .then((d) => setProjects(d.projects ?? []))
+      .then((d) => {
+        setProjects(d.projects ?? []);
+        setIsAdmin(!!d.isAdmin);
+      })
       .catch((e) => {
         // 실패를 조용히 삼키면 "불러오는 중..."에서 영영 멈춰 빈 화면처럼 보인다.
         setError(e instanceof Error ? e.message : "목록을 불러오지 못했습니다.");
@@ -41,8 +45,25 @@ export default function DashboardPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">프로젝트 대시보드</h1>
-          <p className="text-sm text-slate-500 mt-1">브랜드별 AI 추천도 진단 현황을 확인하세요.</p>
+          <h1 className="text-2xl font-bold">
+            프로젝트 대시보드
+            {isAdmin && (
+              <span className="ml-2 align-middle rounded-full bg-slate-900 px-2.5 py-0.5 text-xs font-semibold text-white">
+                운영자 · 전체 보기
+              </span>
+            )}
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">
+            {isAdmin ? "모든 진단이 보입니다." : "이 브라우저에서 만든 진단만 보입니다."}
+            {!isAdmin && (
+              <>
+                {" "}
+                <Link href="/login" className="underline hover:text-slate-700">
+                  운영자 로그인
+                </Link>
+              </>
+            )}
+          </p>
         </div>
         <Link href="/new" className="btn-primary">
           + AI 추천도 진단하기
@@ -73,9 +94,9 @@ export default function DashboardPage() {
             <p className="text-xs font-semibold text-slate-500 mb-3">전에 만든 진단이 있는데 안 보인다면</p>
             <ul className="space-y-2 text-sm text-slate-600">
               <li>
-                <strong className="text-slate-800">· 다른 곳에서 만들었을 수 있습니다.</strong> 내 컴퓨터에서 만든 진단과
-                인터넷에 배포한 주소의 진단은 <strong className="text-slate-800">서로 다른 저장소</strong>를 씁니다. 서로
-                보이지 않습니다.
+                <strong className="text-slate-800">· 다른 기기나 브라우저에서 만들었을 수 있습니다.</strong> 진단은 만든
+                브라우저에서만 보입니다. 그때 받은 <strong className="text-slate-800">내 진단 링크</strong>로 열면 여기에도
+                나타납니다. (내 컴퓨터와 배포 주소는 저장소도 서로 다릅니다.)
               </li>
               <li>
                 <strong className="text-slate-800">· 폴더가 바뀌었을 수 있습니다.</strong> 앱을 새로 내려받았다면 이전

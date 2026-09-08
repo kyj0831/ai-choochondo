@@ -467,3 +467,8 @@ export function crawlSummary(hubId: string): {
     })),
   };
 }
+
+/** 소유 키 해시를 붙인다. 생성 직후 한 번만 부른다. lib/owner.ts 참조 */
+export function setProjectOwnerHash(id: string, hash: string) {
+  getDb().prepare(`UPDATE projects SET owner_token_hash = ? WHERE id = ?`).run(hash, id);
+}

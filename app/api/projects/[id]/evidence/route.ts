@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addEvidence, getProject, listEvidence, listFacts, listQueries, updateEvidenceJudgment, updateProjectStatus } from "@/lib/repo";
+import { addEvidence, listEvidence, listFacts, listQueries, updateEvidenceJudgment, updateProjectStatus } from "@/lib/repo";
+import { requireProject } from "@/lib/owner";
 import { judgeEvidence } from "@/lib/llm";
 import { describeLlmError } from "@/lib/openai";
 
@@ -9,7 +10,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
 // Submit a pasted AI answer as evidence for a query, then judge it (FR-020/021/022/030)
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const project = getProject(params.id);
+  const project = await requireProject(params.id);
   if (!project) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const body = await req.json();

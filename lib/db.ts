@@ -189,6 +189,8 @@ function migrate(db: Database.Database) {
   // 기존 DB에 나중에 추가된 컬럼을 보정한다. CREATE TABLE IF NOT EXISTS는
   // 이미 만들어진 테이블에 새 컬럼을 넣어주지 않기 때문이다.
   addColumnIfMissing(db, "hubs", "published_at", "TEXT");
+  // 소유 키 해시. NULL 이면 이 기능 전에 만든 진단 — 운영자 소유로 본다 (lib/owner.ts).
+  addColumnIfMissing(db, "projects", "owner_token_hash", "TEXT");
 }
 
 function addColumnIfMissing(db: Database.Database, table: string, column: string, ddl: string) {

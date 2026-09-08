@@ -24,6 +24,7 @@ interface Storage {
 export default function ProviderBanner() {
   const [provider, setProvider] = useState<string | null>(null);
   const [storage, setStorage] = useState<Storage | null>(null);
+  const [noAdmin, setNoAdmin] = useState(false);
 
   useEffect(() => {
     fetch("/api/status")
@@ -31,6 +32,7 @@ export default function ProviderBanner() {
       .then((d) => {
         setProvider(d.provider);
         setStorage(d.storage ?? null);
+        setNoAdmin(!!d.storage?.isProduction && d.adminConfigured === false);
       })
       .catch(() => {});
   }, []);
@@ -42,6 +44,13 @@ export default function ProviderBanner() {
           <span className="font-semibold">저장 볼륨이 연결되지 않았습니다 — 다시 배포하면 진단·리포트·발행한 허브가 모두 사라집니다.</span>{" "}
           배포 설정에서 볼륨을 <code className="font-mono bg-red-100 px-1 py-0.5 rounded">/data</code>에 마운트하고 환경변수{" "}
           <code className="font-mono bg-red-100 px-1 py-0.5 rounded">DATA_DIR=/data</code>를 설정하세요.
+        </div>
+      )}
+
+      {noAdmin && (
+        <div className="bg-red-50 border-b border-red-200 text-red-800 text-xs text-center py-2 px-4">
+          <span className="font-semibold">운영자 비밀번호(APP_PASSWORD)가 없습니다.</span> 이 상태에서는 소유 키 없는 옛 진단이
+          누구에게나 보이고, 전체 목록을 볼 운영자도 없습니다. 배포 설정에서 APP_PASSWORD 를 지정하세요.
         </div>
       )}
 

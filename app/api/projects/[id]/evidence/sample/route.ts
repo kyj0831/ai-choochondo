@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addEvidence, getProject, listEvidence, listQueries, updateEvidenceJudgment, updateProjectStatus } from "@/lib/repo";
+import { addEvidence, listEvidence, listQueries, updateEvidenceJudgment, updateProjectStatus } from "@/lib/repo";
+import { requireProject } from "@/lib/owner";
 import { QueryRow } from "@/lib/types";
 
 // 시연·체험용: 모든 질문에 그럴듯한 샘플 답변과 판정을 한 번에 채운다.
 // LLM을 호출하지 않고 결정적으로 생성하므로 즉시·무료이며, PRD의 대표 패턴
 // ("이름 검색은 되지만 범주형 추천에서는 약함")을 재현한다.
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
-  const project = getProject(params.id);
+  const project = await requireProject(params.id);
   if (!project) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const brand = project.brand_name;

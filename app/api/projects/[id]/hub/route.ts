@@ -5,7 +5,6 @@ import {
   crawlSummary,
   getHubByProject,
   getLatestReport,
-  getProject,
   isSlugTaken,
   listAssets,
   listCrawls,
@@ -16,6 +15,7 @@ import {
   normalizeSlug,
   updateHub,
 } from "@/lib/repo";
+import { requireProject } from "@/lib/owner";
 import { canPublish, draftFromReport, hubReadiness, skippedOnPublish } from "@/lib/hub";
 import { publishableFacts } from "@/lib/facts";
 import { measureHubEffect } from "@/lib/hubEffect";
@@ -39,7 +39,7 @@ function missedRecommendQueries(projectId: string): string[] {
 }
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  const project = getProject(params.id);
+  const project = await requireProject(params.id);
   if (!project) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const hub = getHubByProject(params.id);
@@ -79,7 +79,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
 /** 최신 리포트를 근거로 허브 초안을 생성한다. 이미 있으면 그대로 돌려준다. */
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
-  const project = getProject(params.id);
+  const project = await requireProject(params.id);
   if (!project) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const existing = getHubByProject(params.id);
@@ -134,7 +134,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const updated = updateHub(hub.id, body);
   if (!updated) return NextResponse.json({ error: "hub not found" }, { status: 404 });
 
-  const project = getProject(params.id);
+  const project = await requireProject(params.id);
   const facts = listFacts(params.id);
   return NextResponse.json({
     hub: updated,

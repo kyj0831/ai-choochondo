@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { clearSystemQueries, getProject, insertQueries, listQueries, updateProjectStatus } from "@/lib/repo";
+import { clearSystemQueries, insertQueries, listQueries, updateProjectStatus } from "@/lib/repo";
+import { requireProject } from "@/lib/owner";
 import { generateQueries } from "@/lib/llm";
 import { EntityType } from "@/lib/types";
 
@@ -11,7 +12,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 // body.replace=true면 기존 시스템 생성 질문을 먼저 비운다.
 // 없으면 재생성할 때마다 질문이 누적되어 질의군 커버리지 점수가 왜곡된다.
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const project = getProject(params.id);
+  const project = await requireProject(params.id);
   if (!project) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
