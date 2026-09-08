@@ -13,6 +13,28 @@ echo "  AI 추천도 — 최신 코드 받아오기"
 echo "  ────────────────────────────────"
 echo ""
 
+# 서버가 켜진 채로 아래에서 .next 를 지우면 돌아가던 서버가 망가져
+# 모든 페이지가 404 가 된다. 그 상태에서 start.command 를 누르면
+# "이미 켜져 있다"며 새 서버를 띄우지 않고 망가진 서버로 브라우저만 연다.
+# 실제로 그렇게 됐다. 그래서 먼저 끈다 — 이 스크립트 계열이 띄운 개발 서버다.
+if command -v lsof >/dev/null 2>&1 && lsof -ti tcp:3000 >/dev/null 2>&1; then
+  echo "  ℹ️  돌아가던 서버를 먼저 끕니다. (켜진 채로 업데이트하면 화면이 전부 404가 됩니다)"
+  lsof -ti tcp:3000 | xargs kill 2>/dev/null
+  for _ in 1 2 3 4 5; do
+    lsof -ti tcp:3000 >/dev/null 2>&1 || break
+    sleep 1
+  done
+  if lsof -ti tcp:3000 >/dev/null 2>&1; then
+    echo ""
+    echo "  ❌ 서버가 꺼지지 않았습니다. 서버 터미널 창에서 Control + C 를 누른 뒤 다시 실행하세요."
+    echo ""
+    read -r "?엔터를 누르면 창이 닫힙니다..."
+    exit 1
+  fi
+  echo "     껐습니다."
+  echo ""
+fi
+
 if ! command -v git >/dev/null 2>&1; then
   echo "  ❌ git이 설치되어 있지 않습니다."
   echo "     터미널에서  xcode-select --install  을 실행해 설치한 뒤 다시 시도하세요."
