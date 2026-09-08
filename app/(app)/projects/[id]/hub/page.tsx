@@ -96,6 +96,7 @@ export default function HubEditorPage({ params }: { params: { id: string } }) {
   const [readiness, setReadiness] = useState<Readiness | null>(null);
   const [publishCheck, setPublishCheck] = useState<PublishCheck | null>(null);
   const [skipped, setSkipped] = useState<{ faq: number; services: number } | null>(null);
+  const [facts, setFacts] = useState<{ key: string; value: string }[]>([]);
   const [crawlSummary, setCrawlSummary] = useState<CrawlSummary | null>(null);
   const [crawls, setCrawls] = useState<CrawlRow[]>([]);
   const [effect, setEffect] = useState<HubEffect | null>(null);
@@ -118,6 +119,7 @@ export default function HubEditorPage({ params }: { params: { id: string } }) {
       setReadiness(data.readiness ?? null);
       setPublishCheck(data.publishCheck ?? null);
       setSkipped(data.skipped ?? null);
+      setFacts(data.facts ?? []);
       setCrawlSummary(data.crawls?.summary ?? null);
       setCrawls(data.crawls?.recent ?? []);
       setEffect(data.effect ?? null);
@@ -507,6 +509,43 @@ export default function HubEditorPage({ params }: { params: { id: string } }) {
           </ul>
         </div>
       )}
+
+      {/*
+        확인된 사실 — 기본 정보 단계에서 입력한 기준선이 그대로 실린다.
+        여기서는 읽기만 한다. 두 곳에서 편집하게 하면 진단의 정답지와 허브의 공식 정보가
+        어긋나기 시작한다. 정답지는 하나여야 한다.
+      */}
+      <div className="card p-6 mb-5">
+        <div className="flex items-start justify-between gap-4 mb-3">
+          <div>
+            <h2 className="font-semibold">확인된 사실</h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              허브가 존재하는 이유입니다. AI가 틀리게 말하는 영업시간·주소·영업 상태를 여기서 못 박습니다.
+            </p>
+          </div>
+          <Link href={`/projects/${params.id}/setup`} className="btn-ghost shrink-0 text-xs">
+            기본 정보에서 수정 →
+          </Link>
+        </div>
+        {facts.length > 0 ? (
+          <dl className="rounded-lg bg-slate-50 divide-y divide-slate-200">
+            {facts.map((f) => (
+              <div key={f.key} className="grid grid-cols-[7rem_1fr] gap-3 px-4 py-2.5">
+                <dt className="text-sm text-slate-500">{f.key}</dt>
+                <dd className="text-sm text-slate-900 whitespace-pre-line">{f.value}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <div className="rounded-lg border border-dashed border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            아직 입력된 사실이 없습니다. 이 상태로 발행하면 허브에 소개문만 실리고, AI가 틀린 영업시간·주소를 고칠
+            재료가 없습니다.{" "}
+            <Link href={`/projects/${params.id}/setup`} className="underline font-medium">
+              기본 정보에서 입력하기
+            </Link>
+          </div>
+        )}
+      </div>
 
       {/* 정체성 */}
       <div className="card p-6 mb-5 space-y-4">

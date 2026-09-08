@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getHubBySlug, getProject, recordCrawl } from "@/lib/repo";
+import { getHubBySlug, getProject, listFacts, recordCrawl } from "@/lib/repo";
 import { buildLlmsTxt } from "@/lib/hub";
 import { identifyBot } from "@/lib/crawlers";
 
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
 
   const disambiguation =
     project?.same_name_conflict && project.same_name_note ? project.same_name_note : null;
-  const body = buildLlmsTxt(hub, project?.entity_type ?? "기업/제품", url, disambiguation);
+  const body = buildLlmsTxt(hub, project?.entity_type ?? "기업/제품", url, disambiguation, listFacts(hub.project_id));
 
   return new NextResponse(body, {
     status: 200,
