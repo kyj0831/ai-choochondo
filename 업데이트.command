@@ -36,8 +36,13 @@ if [ ! -d .git ]; then
 fi
 
 # 내가 고친 게 있으면 지우지 않고 따로 보관한다. 말없이 날리는 것이 제일 나쁘다.
+#
+# git diff만 보면 '새로 만든 파일'을 놓친다. 그 파일이 새 버전에도 있으면
+# checkout이 덮어쓰기를 거부해 업데이트 자체가 실패한다 — 실제로 그렇게 실패했다.
+# status --porcelain은 새 파일까지 본다.
+# (data/의 진단 기록은 .gitignore 대상이라 여기 걸리지 않는다. 건드리지 않는다.)
 STASHED=0
-if ! git diff --quiet || ! git diff --cached --quiet; then
+if [ -n "$(git status --porcelain)" ]; then
   echo "  ℹ️  이 폴더에서 직접 고친 내용이 있어 따로 보관합니다."
   git stash push -u -m "업데이트 전 자동 보관 $(date '+%Y-%m-%d %H:%M')" >/dev/null 2>&1 && STASHED=1
   echo "     (되돌리려면 터미널에서  git stash pop  )"
