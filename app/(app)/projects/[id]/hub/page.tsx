@@ -45,6 +45,44 @@ const STAGE_STEPS: { key: HubEffect["stage"]; label: string }[] = [
 const DRAFT_MARK = "[초안]";
 const isDraft = (s: string) => s.trim().startsWith(DRAFT_MARK);
 
+/**
+ * API 응답을 읽고, 실패를 반드시 '문장'으로 바꾼다.
+ *
+ * 이 화면이 통째로 비어 보이는 사고가 있었다. 원인은 응답을 확인하지 않은 것이었다 —
+ * 서버가 500(HTML 에러 페이지)을 주면 res.json()이 던지고, 로딩 상태가 끝나지 않아
+ * "불러오는 중..."에서 멈춘다. 회색 작은 글씨 한 줄이라 사용자에게는 빈 화면이다.
+ * 그래서 여기서 모든 실패 경로를 사람이 읽는 한국어로 만든다.
+ */
+async function readApi(res: Response): Promise<Record<string, any>> {
+  const text = await res.text();
+  let data: Record<string, any> = {};
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      // JSON이 아니면 서버 에러 페이지이거나 로그인 화면이 넘어온 것이다.
+      throw new Error(
+        `서버가 예상과 다른 응답을 보냈습니다 (HTTP ${res.status}). 서버가 켜져 있는지 확인해 주세요.`
+      );
+    }
+  }
+  if (res.status === 401) throw new Error("접속 권한이 만료되었습니다. 다시 로그인해 주세요.");
+  if (!res.ok) {
+    const err = new Error(String(data.error || `요청이 실패했습니다 (HTTP ${res.status}).`));
+    (err as any).blockers = data.blockers;
+    throw err;
+  }
+  return data;
+}
+
+function messageOf(e: unknown, fallback: string): string {
+  // fetch가 서버에 닿지도 못하면 TypeError("Failed to fetch")를 던진다.
+  // 브라우저 원문을 그대로 띄우면 사용자가 할 수 있는 일이 없으므로 우리 문장으로 바꾼다.
+  if (e instanceof TypeError) return `${fallback} (서버에 연결하지 못했습니다)`;
+  if (e instanceof Error && e.message) return e.message;
+  return fallback;
+}
+
 const ACCENT_OPTIONS = [
   { key: "indigo", cls: "bg-indigo-600" },
   { key: "emerald", cls: "bg-emerald-600" },
@@ -65,6 +103,7 @@ export default function HubEditorPage({ params }: { params: { id: string } }) {
   const [creating, setCreating] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [origin, setOrigin] = useState("");
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -72,16 +111,22 @@ export default function HubEditorPage({ params }: { params: { id: string } }) {
   useEffect(() => setOrigin(window.location.origin), []);
 
   const load = useCallback(async () => {
-    const res = await fetch(`/api/projects/${params.id}/hub`);
-    const data = await res.json();
-    setHub(data.hub);
-    setReadiness(data.readiness ?? null);
-    setPublishCheck(data.publishCheck ?? null);
-    setCrawlSummary(data.crawls?.summary ?? null);
-    setCrawls(data.crawls?.recent ?? []);
-    setEffect(data.effect ?? null);
-    setMissedQueries(data.missedQueries ?? []);
-    setLoading(false);
+    try {
+      const data = await readApi(await fetch(`/api/projects/${params.id}/hub`));
+      setHub(data.hub);
+      setReadiness(data.readiness ?? null);
+      setPublishCheck(data.publishCheck ?? null);
+      setCrawlSummary(data.crawls?.summary ?? null);
+      setCrawls(data.crawls?.recent ?? []);
+      setEffect(data.effect ?? null);
+      setMissedQueries(data.missedQueries ?? []);
+      setLoadError(null);
+    } catch (e) {
+      setLoadError(messageOf(e, "허브 정보를 불러오지 못했습니다. 네트워크 연결을 확인해 주세요."));
+    } finally {
+      // 성공하든 실패하든 로딩은 반드시 끝낸다. 이걸 빠뜨리면 화면이 영영 멈춘다.
+      setLoading(false);
+    }
   }, [params.id]);
 
   useEffect(() => {
@@ -90,9 +135,15 @@ export default function HubEditorPage({ params }: { params: { id: string } }) {
 
   async function createHub() {
     setCreating(true);
-    await fetch(`/api/projects/${params.id}/hub`, { method: "POST" });
-    await load();
-    setCreating(false);
+    setErrorMsg(null);
+    try {
+      await readApi(await fetch(`/api/projects/${params.id}/hub`, { method: "POST" }));
+      await load();
+    } catch (e) {
+      setErrorMsg(messageOf(e, "허브 초안을 만들지 못했습니다."));
+    } finally {
+      setCreating(false);
+    }
   }
 
   /** 로컬 상태를 즉시 반영하고 저장은 디바운스한다. */
@@ -107,48 +158,81 @@ export default function HubEditorPage({ params }: { params: { id: string } }) {
 
   async function save(changes: Partial<Hub>) {
     setSaveState("saving");
-    const res = await fetch(`/api/projects/${params.id}/hub`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(changes),
-    });
-    const data = await res.json();
-    if (!res.ok) {
+    try {
+      const data = await readApi(
+        await fetch(`/api/projects/${params.id}/hub`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(changes),
+        })
+      );
+      setHub(data.hub);
+      setReadiness(data.readiness ?? null);
+      setPublishCheck(data.publishCheck ?? null);
+      setSaveState("saved");
+      setTimeout(() => setSaveState("idle"), 1500);
+    } catch (e) {
       setSaveState("error");
-      setErrorMsg(data.error || "저장에 실패했습니다.");
-      return;
+      setErrorMsg(messageOf(e, "저장에 실패했습니다."));
     }
-    setHub(data.hub);
-    setReadiness(data.readiness ?? null);
-    setPublishCheck(data.publishCheck ?? null);
-    setSaveState("saved");
-    setTimeout(() => setSaveState("idle"), 1500);
   }
 
   async function togglePublish() {
     if (!hub) return;
-    const res = await fetch(`/api/projects/${params.id}/hub`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ published: !hub.published }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setErrorMsg(data.error || "발행할 수 없습니다.");
-      if (data.blockers) setPublishCheck({ ok: false, blockers: data.blockers });
-      return;
+    try {
+      const data = await readApi(
+        await fetch(`/api/projects/${params.id}/hub`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ published: !hub.published }),
+        })
+      );
+      setHub(data.hub);
+      setPublishCheck(data.publishCheck ?? null);
+      setErrorMsg(null);
+    } catch (e) {
+      setErrorMsg(messageOf(e, "발행할 수 없습니다."));
+      const blockers = (e as any)?.blockers;
+      if (Array.isArray(blockers)) setPublishCheck({ ok: false, blockers });
     }
-    setHub(data.hub);
-    setPublishCheck(data.publishCheck ?? null);
-    setErrorMsg(null);
   }
 
   if (loading) return <p className="text-sm text-slate-400">불러오는 중...</p>;
+
+  // ---- 불러오기 자체가 실패한 경우 ----
+  // 빈 화면 대신 원인과 다음 행동을 보여준다.
+  if (loadError) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="card p-8">
+          <h1 className="text-xl font-bold mb-3">허브 화면을 열지 못했습니다</h1>
+          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 mb-5">{loadError}</div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                setLoading(true);
+                load();
+              }}
+              className="btn-primary"
+            >
+              다시 시도
+            </button>
+            <Link href={`/projects/${params.id}/report`} className="btn-ghost">
+              ← 리포트로
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ---- 아직 허브가 없는 경우 ----
   if (!hub) {
     return (
       <div className="max-w-2xl mx-auto">
+        {errorMsg && (
+          <div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{errorMsg}</div>
+        )}
         <div className="card p-8 text-center">
           <h1 className="text-2xl font-bold mb-3">AI 프로필 허브 만들기</h1>
           <p className="text-sm text-slate-600 leading-relaxed mb-2">
