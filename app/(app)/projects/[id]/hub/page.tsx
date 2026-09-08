@@ -95,6 +95,7 @@ export default function HubEditorPage({ params }: { params: { id: string } }) {
   const [hub, setHub] = useState<Hub | null>(null);
   const [readiness, setReadiness] = useState<Readiness | null>(null);
   const [publishCheck, setPublishCheck] = useState<PublishCheck | null>(null);
+  const [skipped, setSkipped] = useState<{ faq: number; services: number } | null>(null);
   const [crawlSummary, setCrawlSummary] = useState<CrawlSummary | null>(null);
   const [crawls, setCrawls] = useState<CrawlRow[]>([]);
   const [effect, setEffect] = useState<HubEffect | null>(null);
@@ -116,6 +117,7 @@ export default function HubEditorPage({ params }: { params: { id: string } }) {
       setHub(data.hub);
       setReadiness(data.readiness ?? null);
       setPublishCheck(data.publishCheck ?? null);
+      setSkipped(data.skipped ?? null);
       setCrawlSummary(data.crawls?.summary ?? null);
       setCrawls(data.crawls?.recent ?? []);
       setEffect(data.effect ?? null);
@@ -169,6 +171,7 @@ export default function HubEditorPage({ params }: { params: { id: string } }) {
       setHub(data.hub);
       setReadiness(data.readiness ?? null);
       setPublishCheck(data.publishCheck ?? null);
+      setSkipped(data.skipped ?? null);
       setSaveState("saved");
       setTimeout(() => setSaveState("idle"), 1500);
     } catch (e) {
@@ -189,11 +192,19 @@ export default function HubEditorPage({ params }: { params: { id: string } }) {
       );
       setHub(data.hub);
       setPublishCheck(data.publishCheck ?? null);
+      setSkipped(data.skipped ?? null);
       setErrorMsg(null);
     } catch (e) {
-      setErrorMsg(messageOf(e, "발행할 수 없습니다."));
       const blockers = (e as any)?.blockers;
-      if (Array.isArray(blockers)) setPublishCheck({ ok: false, blockers });
+      if (Array.isArray(blockers) && blockers.length) {
+        // 할 일 목록은 바로 아래 카드에 그대로 뜬다.
+        // "아직 발행할 수 없습니다." 한 줄을 위에 또 띄우면 같은 말이 두 번 나올 뿐,
+        // 무엇을 해야 하는지는 알려주지 않는다.
+        setPublishCheck({ ok: false, blockers });
+        setErrorMsg(null);
+      } else {
+        setErrorMsg(messageOf(e, "발행할 수 없습니다."));
+      }
     }
   }
 
@@ -320,6 +331,20 @@ export default function HubEditorPage({ params }: { params: { id: string } }) {
               </ul>
             </div>
           )
+        )}
+
+        {/*
+          비어 있는 항목은 발행을 막지 않는다 — 공개 페이지에 아예 나가지 않기 때문이다.
+          다만 "왜 내 FAQ가 안 보이지?"를 나중에 겪지 않도록 미리 알린다.
+        */}
+        {skipped && (skipped.faq > 0 || skipped.services > 0) && (
+          <p className="mt-3 text-xs text-slate-500">
+            비워둔 항목
+            {skipped.faq > 0 && ` FAQ ${skipped.faq}개`}
+            {skipped.faq > 0 && skipped.services > 0 && " ·"}
+            {skipped.services > 0 && ` 서비스 ${skipped.services}개`}
+            는 공개 페이지에 표시되지 않습니다. 지금 발행해도 되고, 나중에 채워 넣어도 됩니다.
+          </p>
         )}
       </div>
 

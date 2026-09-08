@@ -142,7 +142,18 @@ function markDraft(s: string | undefined): string {
 
 /**
  * 발행 가능 여부를 판정한다.
- * 자동 초안이 그대로 남아 있거나 핵심 필드가 비어 있으면 공개를 막는다.
+ *
+ * 막는 기준은 하나다 — **검증되지 않은 내용이 공개되는가.**
+ * 자동 생성 문구([초안])는 사용자가 확인하지 않은 서술이므로 공개되면 안 된다.
+ *
+ * 반대로 '빈 항목'은 막지 않는다. 답이 비어 있는 FAQ와 설명이 비어 있는 서비스는
+ * 공개 페이지·JSON-LD·llms.txt 어디에도 애초에 나가지 않기 때문이다(각 빌더가
+ * 이미 filter로 걸러낸다). 나가지도 않는 항목 때문에 발행을 막으면 지켜지는 것은
+ * 없고 사장님만 붙잡힌다.
+ *
+ * 이 구분이 중요한 이유: 초안 생성기가 키워드로 서비스를, 미노출 질의로 FAQ를
+ * 자동으로 만들어 둔다. 그것들을 발행 조건으로 삼으면 앱이 스스로 낸 숙제로
+ * 스스로를 막는 꼴이 된다. 실제로 그렇게 막혀 있었다.
  */
 export function canPublish(hub: Hub): { ok: boolean; blockers: string[] } {
   const blockers: string[] = [];
@@ -161,17 +172,18 @@ export function canPublish(hub: Hub): { ok: boolean; blockers: string[] } {
     blockers.push("공식 채널을 최소 1개 연결하세요.");
   }
 
-  const emptyFaq = hub.faq.filter((f) => f.q.trim() && !f.a.trim()).length;
-  if (emptyFaq > 0) {
-    blockers.push(`답변이 비어 있는 FAQ가 ${emptyFaq}개 있습니다. 답을 쓰거나 항목을 삭제하세요.`);
-  }
-
-  const emptyService = hub.services.filter((s) => s.title.trim() && !s.description.trim()).length;
-  if (emptyService > 0) {
-    blockers.push(`설명이 비어 있는 서비스가 ${emptyService}개 있습니다.`);
-  }
-
   return { ok: blockers.length === 0, blockers };
+}
+
+/**
+ * 발행은 되지만 공개 페이지에 나가지 않는 항목을 센다.
+ * 막지는 않되, 사장님이 "왜 내 FAQ가 안 보이지?"라고 묻기 전에 미리 알려주기 위한 것이다.
+ */
+export function skippedOnPublish(hub: Hub): { faq: number; services: number } {
+  return {
+    faq: hub.faq.filter((f) => f.q.trim() && !f.a.trim()).length,
+    services: hub.services.filter((s) => s.title.trim() && !s.description.trim()).length,
+  };
 }
 
 function safeParseArray(raw: string): string[] {

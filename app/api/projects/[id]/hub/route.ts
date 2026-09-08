@@ -15,7 +15,7 @@ import {
   normalizeSlug,
   updateHub,
 } from "@/lib/repo";
-import { canPublish, draftFromReport, hubReadiness } from "@/lib/hub";
+import { canPublish, draftFromReport, hubReadiness, skippedOnPublish } from "@/lib/hub";
 import { measureHubEffect } from "@/lib/hubEffect";
 import { ReportJSON } from "@/lib/types";
 
@@ -65,6 +65,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     hub,
     readiness: hubReadiness(hub),
     publishCheck: canPublish(hub),
+    skipped: skippedOnPublish(hub),
     crawls: { summary, recent },
     effect,
     missedQueries: missedRecommendQueries(params.id),
@@ -132,5 +133,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     hub: updated,
     readiness: hubReadiness(updated),
     publishCheck: canPublish(updated),
+    skipped: skippedOnPublish(updated),
   });
 }
