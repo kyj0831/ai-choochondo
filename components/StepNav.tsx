@@ -1,5 +1,7 @@
 "use client";
 
+import OwnerLink from "./OwnerLink";
+
 const STEPS = [
   { key: "setup", label: "1. 기본 정보" },
   { key: "queries", label: "2. 질문 세트" },
@@ -10,6 +12,9 @@ const STEPS = [
 export default function StepNav({ current }: { current: "setup" | "queries" | "evidence" | "report" }) {
   const idx = STEPS.findIndex((s) => s.key === current);
   return (
+    <>
+    {/* 진단의 네 단계 어디서든 복구 링크가 보이게 한다. 잃어버리면 못 찾는 링크다. */}
+    <OwnerLink />
     <div className="flex items-center gap-2 mb-8">
       {STEPS.map((s, i) => (
         <div key={s.key} className="flex items-center gap-2">
@@ -28,5 +33,6 @@ export default function StepNav({ current }: { current: "setup" | "queries" | "e
         </div>
       ))}
     </div>
+    </>
   );
 }

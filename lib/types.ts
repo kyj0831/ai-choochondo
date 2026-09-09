@@ -35,6 +35,8 @@ export interface Project {
   audiences: string; // JSON string[]
   same_name_conflict: number; // 0/1
   same_name_note: string | null;
+  /** 소유 키의 SHA-256. NULL 이면 소유자 없는 옛 진단. lib/owner.ts 참조 */
+  owner_token_hash: string | null;
   status: "draft" | "setup" | "queries" | "evidence" | "analyzed";
   created_at: string;
   updated_at: string;

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getProject, listEvidence, listQueries, updateProjectStatus } from "@/lib/repo";
+import { listEvidence, listQueries, updateProjectStatus } from "@/lib/repo";
+import { requireProject } from "@/lib/owner";
 import { configuredEngines } from "@/lib/engines";
 import { runAutoProbeForQuery, ProbeOutcome } from "@/lib/autoProbe";
 
@@ -19,7 +20,7 @@ const BATCH_SIZE = 3;
  * 질문별 자동 수집(auto-probe) 엔드포인트를 쓴다.
  */
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
-  const project = getProject(params.id);
+  const project = await requireProject(params.id);
   if (!project) return NextResponse.json({ error: "프로젝트를 찾을 수 없습니다." }, { status: 404 });
 
   const engines = configuredEngines();

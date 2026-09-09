@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getProject, listQueries, updateProjectStatus } from "@/lib/repo";
+import { listQueries, updateProjectStatus } from "@/lib/repo";
+import { requireProject } from "@/lib/owner";
 import { configuredEngines } from "@/lib/engines";
 import { runAutoProbeForQuery } from "@/lib/autoProbe";
 
@@ -10,7 +11,7 @@ export const maxDuration = 60;
 
 /** 질문 하나에 대해 설정된 모든 엔진(API 키가 있는 것만)을 자동으로 호출해 증거를 채운다. */
 export async function POST(_req: NextRequest, { params }: { params: { id: string; qid: string } }) {
-  const project = getProject(params.id);
+  const project = await requireProject(params.id);
   if (!project) return NextResponse.json({ error: "프로젝트를 찾을 수 없습니다." }, { status: 404 });
 
   const query = listQueries(params.id).find((q) => q.id === params.qid);

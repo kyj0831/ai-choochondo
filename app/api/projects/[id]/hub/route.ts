@@ -5,17 +5,19 @@ import {
   crawlSummary,
   getHubByProject,
   getLatestReport,
-  getProject,
   isSlugTaken,
   listAssets,
   listCrawls,
   listEvidence,
+  listFacts,
   listQueries,
   listReports,
   normalizeSlug,
   updateHub,
 } from "@/lib/repo";
-import { canPublish, draftFromReport, hubReadiness } from "@/lib/hub";
+import { requireProject } from "@/lib/owner";
+import { canPublish, draftFromReport, hubReadiness, skippedOnPublish } from "@/lib/hub";
+import { publishableFacts } from "@/lib/facts";
 import { measureHubEffect } from "@/lib/hubEffect";
 import { ReportJSON } from "@/lib/types";
 
@@ -37,7 +39,7 @@ function missedRecommendQueries(projectId: string): string[] {
 }
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  const project = getProject(params.id);
+  const project = await requireProject(params.id);
   if (!project) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const hub = getHubByProject(params.id);
@@ -61,10 +63,14 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     },
   });
 
+  const facts = listFacts(params.id);
   return NextResponse.json({
     hub,
-    readiness: hubReadiness(hub),
+    readiness: hubReadiness(hub, project.entity_type, facts),
     publishCheck: canPublish(hub),
+    skipped: skippedOnPublish(hub),
+    // 허브에 자동으로 실리는 사실. 편집 화면은 읽기만 하고, 수정은 기본 정보 단계에서 한다.
+    facts: publishableFacts(project.entity_type, facts),
     crawls: { summary, recent },
     effect,
     missedQueries: missedRecommendQueries(params.id),
@@ -73,7 +79,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
 /** 최신 리포트를 근거로 허브 초안을 생성한다. 이미 있으면 그대로 돌려준다. */
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
-  const project = getProject(params.id);
+  const project = await requireProject(params.id);
   if (!project) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const existing = getHubByProject(params.id);
@@ -128,9 +134,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const updated = updateHub(hub.id, body);
   if (!updated) return NextResponse.json({ error: "hub not found" }, { status: 404 });
 
+  const project = await requireProject(params.id);
+  const facts = listFacts(params.id);
   return NextResponse.json({
     hub: updated,
-    readiness: hubReadiness(updated),
+    readiness: hubReadiness(updated, project?.entity_type ?? "기업/제품", facts),
     publishCheck: canPublish(updated),
+    skipped: skippedOnPublish(updated),
+    facts: publishableFacts(project?.entity_type ?? "기업/제품", facts),
   });
 }
