@@ -33,19 +33,42 @@ function QueryEvidenceCard({
   projectId,
   query,
   evidence,
+  configuredEngines,
   onChange,
 }: {
   projectId: string;
   query: QueryRow;
   evidence: EvidenceRow[];
+  configuredEngines: string[];
   onChange: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [engine, setEngine] = useState(ENGINES[0]);
   const [text, setText] = useState("");
+  const [links, setLinks] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [warn, setWarn] = useState("");
   const [copied, setCopied] = useState(false);
+  const [autoProbing, setAutoProbing] = useState(false);
+
+  async function autoProbeThis() {
+    setAutoProbing(true);
+    setWarn("");
+    try {
+      const res = await fetch(`/api/projects/${projectId}/queries/${query.id}/auto-probe`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "자동 수집 실패");
+      const failed = (data.results || []).filter((r: { status: string }) => r.status === "failed");
+      if (failed.length) {
+        setWarn(failed.map((r: { engine: string; warning?: string }) => `${r.engine}: ${r.warning || "실패"}`).join(" · "));
+      }
+      onChange();
+    } catch (e: any) {
+      setWarn(e.message);
+    } finally {
+      setAutoProbing(false);
+    }
+  }
 
   function copyQuestion() {
     navigator.clipboard.writeText(query.text);
@@ -58,14 +81,26 @@ function QueryEvidenceCard({
     setSubmitting(true);
     setWarn("");
     try {
+      // ChatGPT·Perplexity·Gemini는 출처를 본문 URL이 아니라 별도 각주 칩으로
+      // 보여준다. "답변 전문 복사"만으로는 그 링크가 딸려오지 않아 근거 부록이
+      // 통째로 비게 되므로, 사용자가 따로 붙여넣은 링크를 판정 대상 텍스트
+      // 끝에 명시적으로 이어 붙인다. 판정(mock·실제 LLM 모두)이 URL을 텍스트에서
+      // 추출하는 방식이라 이렇게만 해도 그대로 인식된다.
+      const linkList = links
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean);
+      const fullText = linkList.length ? `${text}\n\n[출처 링크]\n${linkList.join("\n")}` : text;
+
       const res = await fetch(`/api/projects/${projectId}/evidence`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query_id: query.id, engine_label: engine, response_text: text, status }),
+        body: JSON.stringify({ query_id: query.id, engine_label: engine, response_text: fullText, status }),
       });
       const data = await res.json();
       if (data.warning) setWarn(data.warning);
       setText("");
+      setLinks("");
       setOpen(false);
       onChange();
     } finally {
@@ -85,9 +120,21 @@ function QueryEvidenceCard({
           {query.sub_category && <span className="badge bg-slate-200 text-slate-600 mr-2">{query.sub_category}</span>}
           <span className="text-sm font-medium">{query.text}</span>
         </div>
-        <button onClick={() => setOpen((o) => !o)} className="btn-ghost shrink-0">
-          {open ? "취소" : "+ 답변 추가"}
-        </button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {configuredEngines.length > 0 && (
+            <button
+              onClick={autoProbeThis}
+              disabled={autoProbing}
+              className="btn-ghost text-xs"
+              title={`설정된 엔진(${configuredEngines.join("·")})으로 이 질문만 자동 수집`}
+            >
+              {autoProbing ? "수집 중..." : "🤖 자동 수집"}
+            </button>
+          )}
+          <button onClick={() => setOpen((o) => !o)} className="btn-ghost shrink-0">
+            {open ? "취소" : "+ 답변 추가"}
+          </button>
+        </div>
       </div>
 
       {evidence.length > 0 && (
@@ -119,7 +166,13 @@ function QueryEvidenceCard({
               아래 <span className="font-semibold text-slate-700">"질문 복사"</span> 버튼으로 이 질문을 복사
             </li>
             <li>ChatGPT·Perplexity 등 AI 서비스에 붙여넣고 직접 물어보기</li>
-            <li>거기서 받은 답변 전문을 복사해서 아래 입력창에 붙여넣고 제출</li>
+            <li>거기서 받은 답변 전문을 복사해서 아래 입력창에 붙여넣기</li>
+            <li>
+              <span className="font-semibold text-amber-700">출처 링크도 따로 챙기기</span> — Perplexity·Gemini는
+              출처를 본문 글자가 아니라 번호가 매겨진 각주로 따로 보여준다. 답변만 복사하면 이 링크가
+              빠져 "근거 부록"이 빈 채로 남는다. 각주를 눌러 나오는 링크를 우클릭 → 링크 주소 복사해서
+              아래 "출처 링크" 칸에 한 줄씩 붙여넣으면 리포트 근거에 반영된다
+            </li>
           </ol>
           <div className="flex gap-2">
             <select className="input w-40" value={engine} onChange={(e) => setEngine(e.target.value)}>
@@ -139,6 +192,17 @@ function QueryEvidenceCard({
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
+          <div>
+            <label className="text-xs font-medium text-slate-600 block mb-1">
+              출처 링크 <span className="font-normal text-slate-400">(있으면 한 줄에 하나씩 — 선택이지만 넣을수록 근거 부록·출처 신뢰도 점수가 정확해짐)</span>
+            </label>
+            <textarea
+              className="input min-h-[56px] text-xs"
+              placeholder={"https://...\nhttps://..."}
+              value={links}
+              onChange={(e) => setLinks(e.target.value)}
+            />
+          </div>
           <div className="flex gap-2">
             <button onClick={() => submit()} disabled={submitting || !text.trim()} className="btn-primary text-xs !px-4 !py-2">
               {submitting ? "판정 중..." : "제출 및 판정"}
@@ -161,8 +225,11 @@ export default function EvidencePage({ params }: { params: { id: string } }) {
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [filling, setFilling] = useState(false);
+  const [autoCollecting, setAutoCollecting] = useState(false);
   const [error, setError] = useState("");
   const [filterType, setFilterType] = useState<QueryType | "all">("all");
+  const [configuredEngines, setConfiguredEngines] = useState<string[]>([]);
+  const [allEngines, setAllEngines] = useState<string[]>([]);
 
   // Guards against out-of-order responses: React StrictMode (dev) double-invokes
   // this effect, and onChange callbacks can also trigger overlapping calls. Only
@@ -181,6 +248,13 @@ export default function EvidencePage({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     load();
+    fetch("/api/status")
+      .then((r) => r.json())
+      .then((data) => {
+        setConfiguredEngines(data.configuredEngines || []);
+        setAllEngines(data.engines || []);
+      })
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
 
@@ -204,7 +278,16 @@ export default function EvidencePage({ params }: { params: { id: string } }) {
   }
 
   // 시연·체험용: 모든 질문에 샘플 답변을 채운 뒤 곧바로 분석까지 실행한다.
+  // 이 데이터는 브랜드명만 바뀌어 들어가는 고정 문구라 실제 진단과 결과가
+  // 다르다. 실수로 눌러 진짜 진단인 줄 알고 고객에게 전달하는 사고가 있었으므로
+  // 확인 절차를 거친다.
   async function fillSampleAndAnalyze() {
+    const ok = window.confirm(
+      "샘플 데이터는 브랜드명만 바뀐 고정 문구라, 어떤 브랜드를 넣어도 점수·근거가 거의 똑같이 나옵니다.\n\n" +
+        "실제 진단이 아니므로 화면 구경용으로만 쓰고, 이 결과를 고객에게 전달하지 마세요.\n\n" +
+        "그래도 데모로 채워볼까요?"
+    );
+    if (!ok) return;
     setFilling(true);
     setError("");
     try {
@@ -218,6 +301,23 @@ export default function EvidencePage({ params }: { params: { id: string } }) {
     } catch (e: any) {
       setError(e.message);
       setFilling(false);
+    }
+  }
+
+  // 설정된 엔진(API 키가 있는 것만)에 아직 증거가 없는 질문을 자동으로 던지고
+  // 답변·판정까지 한 번에 채운다. 이미 증거가 있는 질문은 건드리지 않는다.
+  async function autoCollectAll() {
+    setAutoCollecting(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/projects/${params.id}/evidence/auto-collect`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "자동 수집 실패");
+      await load();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setAutoCollecting(false);
     }
   }
 
@@ -235,27 +335,49 @@ export default function EvidencePage({ params }: { params: { id: string } }) {
           </div>
         </div>
         <div className="flex flex-col items-end gap-1.5">
-          <button onClick={runAnalysis} disabled={analyzing || filling || judgedQueryIds.size === 0} className="btn-primary">
+          <button onClick={runAnalysis} disabled={analyzing || filling || autoCollecting || judgedQueryIds.size === 0} className="btn-primary">
             {analyzing ? "분석 중..." : "분석 실행 →"}
           </button>
           {judgedQueryIds.size === 0 && (
             <>
-              <span className="text-xs text-slate-400">답변을 직접 넣거나, 아래 버튼으로 체험해보세요</span>
-              <button onClick={fillSampleAndAnalyze} disabled={filling} className="btn-secondary text-xs">
-                {filling ? "샘플 채우는 중..." : "⚡ 샘플 답변으로 바로 체험하기"}
+              {configuredEngines.length > 0 ? (
+                <button onClick={autoCollectAll} disabled={autoCollecting || filling} className="btn-secondary text-xs">
+                  {autoCollecting ? "자동 수집 중... (몇 분 걸릴 수 있음)" : `🤖 자동 수집 (${configuredEngines.join("·")})`}
+                </button>
+              ) : (
+                <span className="text-xs text-slate-400 max-w-[220px] text-right">
+                  자동 수집을 쓰려면 .env.local에 엔진 API 키를 하나 이상 넣으세요
+                </span>
+              )}
+              <span className="text-xs text-slate-400">또는 답변을 직접 넣거나, 아래 버튼으로 화면만 미리 체험해보세요</span>
+              <button onClick={fillSampleAndAnalyze} disabled={filling || autoCollecting} className="btn-secondary text-xs text-amber-700">
+                {filling ? "샘플 채우는 중..." : "⚡ [데모] 가짜 답변으로 화면만 미리 보기"}
               </button>
             </>
           )}
         </div>
       </div>
+      {allEngines.length > 0 && (
+        <p className="text-xs text-slate-400 mb-3 -mt-2">
+          엔진 연결 상태:{" "}
+          {allEngines.map((en) => (
+            <span key={en} className={`mr-2 ${configuredEngines.includes(en) ? "text-emerald-600" : "text-slate-300"}`}>
+              {configuredEngines.includes(en) ? "●" : "○"} {en}
+            </span>
+          ))}
+          <span className="text-slate-400">— 자동 수집은 ● 표시된 엔진만 실제로 호출합니다</span>
+        </p>
+      )}
       {judgedQueryIds.size === 0 && (
         <p className="text-xs text-slate-400 mb-3 -mt-2">
-          <span className="font-semibold text-slate-500">"샘플 답변으로 바로 체험하기"</span>는 예시 데이터로 16개 질문을 즉시 채우고 분석까지 실행합니다. 결과 리포트가 어떻게 나오는지 시연·확인할 때 쓰세요. 실제 진단은 각 질문에 진짜 AI 답변을 붙여넣어야 정확합니다.
+          <span className="font-semibold text-slate-500">자동 수집</span>은 설정된 엔진 API로 질문을 실제로 던지고 답변·판정까지
+          자동으로 채웁니다(엔진별 API 사용료 발생). <span className="font-semibold text-slate-500">"[데모] 화면만 미리 보기"</span>는
+          예시 데이터로 즉시 채우는 시연용이라 실제 진단이 아닙니다.
         </p>
       )}
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
       <p className="text-xs text-slate-400 mb-4">
-        각 질문 카드의 <span className="font-semibold">"+ 답변 추가"</span>를 눌러 펼친 뒤, 질문을 복사해 ChatGPT/Perplexity/Gemini 등에 직접 물어보고 받은 답변을 붙여넣어 제출하세요. 최소 1개 이상 제출하면 분석할 수 있지만, 신뢰도 배지를 위해 질문 8개 이상·엔진 2개 이상을 권장합니다.
+        각 질문 카드의 <span className="font-semibold">"+ 답변 추가"</span>를 눌러 펼친 뒤, 질문을 복사해 ChatGPT/Perplexity/Gemini 등에 직접 물어보고 받은 답변을 붙여넣어 제출하세요. 답변에 딸린 출처 각주가 있으면 링크도 따로 복사해 "출처 링크" 칸에 붙여넣으세요 — 안 넣으면 근거 부록과 출처 신뢰도 점수가 실제보다 낮게 나옵니다. 최소 1개 이상 제출하면 분석할 수 있지만, 신뢰도 배지를 위해 질문 8개 이상·엔진 2개 이상을 권장합니다.
       </p>
 
       <div className="flex gap-2 mb-4 flex-wrap">
@@ -270,7 +392,14 @@ export default function EvidencePage({ params }: { params: { id: string } }) {
       </div>
 
       {visibleQueries.map((q) => (
-        <QueryEvidenceCard key={q.id} projectId={params.id} query={q} evidence={evidence.filter((e) => e.query_id === q.id)} onChange={load} />
+        <QueryEvidenceCard
+          key={q.id}
+          projectId={params.id}
+          query={q}
+          evidence={evidence.filter((e) => e.query_id === q.id)}
+          configuredEngines={configuredEngines}
+          onChange={load}
+        />
       ))}
     </div>
   );

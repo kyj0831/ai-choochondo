@@ -75,8 +75,11 @@ export function buildReportHtml(input: ReportHtmlInput): string {
   });
 
   const queryById = new Map(queries.map((q) => [q.id, q]));
-  // 키가 없어 샘플 로직으로 만든 리포트인지. 표지에 경고를 띄우는 근거가 된다.
-  const isMock = isMockMode();
+  // 표지에 경고를 띄우는 두 가지 근거: 키가 없어 채점 자체가 샘플 로직으로
+  // 돌았거나(isMock), 증거 수집 단계에서 "샘플 답변으로 체험하기"로 채워
+  // 넣은 가짜 답변이 하나라도 섞여 있는 경우(hasSampleEvidence). 실제 키가
+  // 있어도 후자는 진짜 진단이 아니므로 반드시 함께 확인해야 한다.
+  const isMock = isMockMode() || evidence.some((e) => e.is_sample === 1);
 
   return `<!DOCTYPE html>
 <html lang="ko"><head><meta charset="utf-8"><title>${esc(project.brand_name)} AI 추천도 리포트</title>
@@ -181,10 +184,18 @@ export function buildReportHtml(input: ReportHtmlInput): string {
     isMock
       ? `<div class="demo-warn">
     <b>⚠ 데모(샘플) 리포트 — 실제 AI 진단 결과가 아닙니다</b>
-    <p>LLM API 키가 설정되지 않아 샘플 로직으로 생성된 문서입니다. 점수·판정·근거는 실제 측정값이
+    <p>${
+      evidence.some((e) => e.is_sample === 1)
+        ? `증거 수집 단계에서 "샘플 답변으로 바로 체험하기"로 채운 가짜 답변이 포함돼 있습니다.
+    문장·점수·신뢰도가 브랜드와 무관하게 고정된 값이라, 어떤 브랜드를 넣어도 결과가 거의
+    같게 나옵니다. 고객에게 전달하거나 의사결정에 사용하지 마세요.<br>
+    실제 진단을 하려면 이 진단 대신 새 진단을 만들고, 각 질문에 진짜 ChatGPT·Perplexity·
+    Gemini 답변을 직접 붙여넣으세요.`
+        : `LLM API 키가 설정되지 않아 샘플 로직으로 생성된 문서입니다. 점수·판정·근거는 실제 측정값이
     아니므로 고객에게 전달하거나 의사결정에 사용하지 마세요.<br>
     실제 진단을 하려면 <code>.env.local</code>에 OPENAI_API_KEY 또는 ANTHROPIC_API_KEY를 넣고
-    서버를 다시 시작한 뒤 새로 진단하세요.</p>
+    서버를 다시 시작한 뒤 새로 진단하세요.`
+    }</p>
   </div>`
       : ""
   }
@@ -262,6 +273,69 @@ export function buildReportHtml(input: ReportHtmlInput): string {
   <p style="margin:0">${esc(r.why_weak)}</p>
 </section>
 
+<!-- AI가 지금 우리를 어떻게 아는가 -->
+${
+  r.ai_perception
+    ? `<section class="pagebreak">
+  <h2 class="sec-title">AI는 지금 우리를 이렇게 알고 있다</h2>
+  <p style="margin:0 0 12px">${esc(r.ai_perception.current_summary)}</p>
+  ${
+    r.ai_perception.wrong_or_outdated?.length
+      ? `<div class="card" style="border-left:3px solid #dc2626; padding-left:10px; margin-bottom:10px">
+    <div class="sm" style="font-weight:700; color:#991b1b; margin-bottom:4px">틀렸거나 오래된 설명</div>
+    <ul class="sm" style="margin:0; padding-left:16px">
+      ${r.ai_perception.wrong_or_outdated.map((x) => `<li>${esc(x)}</li>`).join("")}
+    </ul>
+  </div>`
+      : ""
+  }
+  ${
+    r.ai_perception.missing?.length
+      ? `<div class="card" style="border-left:3px solid #d97706; padding-left:10px">
+    <div class="sm" style="font-weight:700; color:#92400e; margin-bottom:4px">AI가 모르는 핵심 정보</div>
+    <ul class="sm" style="margin:0; padding-left:16px">
+      ${r.ai_perception.missing.map((x) => `<li>${esc(x)}</li>`).join("")}
+    </ul>
+  </div>`
+      : ""
+  }
+</section>`
+    : ""
+}
+
+<!-- 검색 갭: 왜 안 나오고 뭘 고치면 되는가 -->
+${
+  r.search_gaps?.length
+    ? `<section class="pagebreak">
+  <h2 class="sec-title">검색 갭 — 왜 안 나오고, 뭘 고치면 나오는가</h2>
+  <p class="sm muted" style="margin:0 0 10px">
+    실제로 물어본 질문 중 노출이 약한 것부터 정리했습니다. 각 항목의 "이렇게 고친다"를
+    그대로 실행하면 다음 재점검에서 결과가 달라집니다.
+  </p>
+  <table>
+    <thead><tr>
+      <th style="width:26%">질문</th><th style="width:10%">현재</th>
+      <th style="width:32%">왜 이렇게 나오나</th><th>이렇게 고친다</th>
+    </tr></thead>
+    <tbody>
+      ${r.search_gaps
+        .map(
+          (g) => `<tr>
+        <td class="sm">${esc(g.query)}</td>
+        <td class="sm"><b style="color:${
+          g.status === "노출" ? "#059669" : g.status === "약함" ? "#d97706" : "#dc2626"
+        }">${esc(g.status)}</b></td>
+        <td class="sm">${esc(g.why)}</td>
+        <td class="sm">${esc(g.fix)}</td>
+      </tr>`
+        )
+        .join("")}
+    </tbody>
+  </table>
+</section>`
+    : ""
+}
+
 <!-- 액션 -->
 <section class="pagebreak">
   <h2 class="sec-title">우선 실행 액션</h2>
@@ -305,6 +379,34 @@ export function buildReportHtml(input: ReportHtmlInput): string {
   }
 </section>
 
+<!-- 30일 재점검 체크리스트 (PRD F7) -->
+${
+  r.recheck_checklist?.length
+    ? `<section class="pagebreak">
+  <h2 class="sec-title">30일 재점검 체크리스트</h2>
+  <p class="sm muted" style="margin:0 0 10px">
+    위 액션을 실행한 뒤 30일이 지나면 아래 항목을 직접 점검하세요.
+    생성형 AI 답변은 매번 흔들리므로 통과 기준은 100% 재현이 아니라 다수결로 잡았습니다.
+  </p>
+  <table>
+    <thead><tr>
+      <th style="width:28%">점검 항목</th><th style="width:38%">확인 방법</th><th>통과 기준</th>
+    </tr></thead>
+    <tbody>
+      ${r.recheck_checklist
+        .map(
+          (c) =>
+            `<tr><td><b>${esc(c.item)}</b></td><td class="sm">${esc(c.how)}</td><td class="sm">${esc(
+              c.pass_criteria
+            )}</td></tr>`
+        )
+        .join("")}
+    </tbody>
+  </table>
+</section>`
+    : ""
+}
+
 <!-- 근거 -->
 <section class="pagebreak">
   <h2 class="sec-title">근거 부록 — 질문별 관측 결과</h2>
@@ -327,12 +429,23 @@ export function buildReportHtml(input: ReportHtmlInput): string {
             <td class="sm">${esc(q?.text ?? "(삭제된 질문)")}</td>
             <td class="sm">${esc(e.engine_label)}</td>
             <td class="sm">${esc(MENTION_LABEL[e.mention_type ?? ""] ?? "미판정")}</td>
-            <td class="xs muted">${cites.length ? cites.map((c) => esc(c)).join("<br>") : "-"}</td>
+            <td class="xs muted">${
+              cites.length
+                ? cites.map((c) => esc(c)).join("<br>")
+                : e.entity_found === 1
+                ? "출처 미표기"
+                : "—"
+            }</td>
           </tr>`;
         })
         .join("")}
     </tbody>
   </table>
+  <p class="xs muted" style="margin-top:8px">
+    "출처 미표기"는 브랜드가 언급됐으나 해당 답변이 인용 URL을 제시하지 않은 경우입니다.
+    엔진·질문에 따라 인용을 달지 않는 경우가 흔하며, 출처가 없다는 뜻은 아닙니다.
+    "—"는 브랜드가 응답에 등장하지 않은 경우입니다.
+  </p>
 </section>
 
 <footer class="xs muted">

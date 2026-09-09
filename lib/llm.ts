@@ -26,6 +26,15 @@ export interface GeneratedQuery {
 export async function generateQueries(input: GenerateQueriesInput): Promise<GeneratedQuery[]> {
   if (isMockMode()) return mockQueries(input);
 
+  // "맡기다"는 의뢰하는 업종에만 어울린다. 카페·가게 같은 소비자 브랜드에 쓰면
+  // "커피숍은 어디에 맡기면 좋을까?" 같은 문장이 나와 리포트에 그대로 찍힌다.
+  const situationalHint =
+    input.entityType === "자영업/로컬"
+      ? `구체적인 상황을 제시하고 "어디에 가면 좋겠냐 / 어디가 좋겠냐"고 묻는 형태.
+  (예: "시험 기간에 오래 앉아 공부하기 좋은 카페는 어디야?")`
+      : `구체적인 상황·문제를 제시하고 "그래서 어디에/누구에게 맡기면 좋겠냐"고 묻는 형태.
+  (예: "시리즈A 앞두고 언론 노출을 늘려야 하는데 어디에 맡기면 좋을까?")`;
+
   const system = `당신은 AI 검색 가시성 진단을 위한 질의 설계자다.
 생성한 질문은 실제로 ChatGPT·Perplexity 같은 AI에 입력되고, 그 답변에 이 브랜드가
 등장하는지로 점수를 매긴다. 따라서 모든 질문은 "판정 가능"해야 한다.
@@ -55,14 +64,38 @@ recommend / situational / compare 질문은 **AI가 답할 때 특정 업체·�
 - "OO 분야에서 유명한 사람 알려줘"
 - "국내 OO 업체 중 어디가 괜찮아?"
 
+## 절대 규칙 3 — 추천 질문에는 지역과 "이름을 대라"는 요구가 둘 다 있어야 한다
+지역이 없으면 AI가 세계 기준으로 답하거나 일반론으로 빠진다.
+이름을 요구하지 않으면 AI가 업종·카테고리만 나열하고 끝낸다. 둘 다 실측이 불가능해진다.
+
+실제로 실패한 사례다(빽다방 진단):
+- "디저트가 필요한데 어디에 가면 좋을까?"
+  → 답: "1. 카페: 다양한 케이크, 파이, 쿠키 등을 제공하는 카페가 많습니다"
+  → 카테고리만 답했다. 어떤 브랜드도 등장할 수 없어 측정 불가.
+- "직장인들이 자주 가는 커피숍은 어디야?"
+  → 답: "편리한 위치와 쾌적한 분위기, 다양한 메뉴를 갖춘 곳이 많습니다"
+  → 조건 설명만 답했다. 측정 불가.
+같은 진단에서 유일하게 성공한 질문:
+- "커피를 좋아하는 사람들에게 인기 있는 프랜차이즈는 어디야?"
+  → 답: "1. 스타벅스 - 전 세계적으로 유명한 커피 전문점으로…"
+  → 브랜드명이 나열됐다. 측정 가능.
+
+그러므로 recommend / situational 질문은 반드시:
+1. 지역을 문장 안에 넣어라(예: "국내", "한국에서", 또는 주어진 region).
+2. 이름을 요구하는 표현을 넣어라 — "브랜드", "프랜차이즈", "업체", "회사", "가게 이름",
+   "누구", "어느 브랜드" 등. 개인 대상이면 "누가", "어떤 강사" 같은 표현을 쓴다.
+
 ## 타입별 지시
 - "direct" — 정확히 3개. **브랜드명 필수 포함.** 브랜드 자체를 묻는 질문
   (예: "OO는 어떤 곳이야?", "OO에 대해 알려줘", "OO 어디에 있어?")
 - "recommend" — 6개. **브랜드명 절대 미포함.** 카테고리·지역·대상 기반 추천 요청.
 - "situational" — 4개. **브랜드명 절대 미포함.**
-  구체적인 상황·문제를 제시하고 "그래서 어디에/누구에게 맡기면 좋겠냐"고 묻는 형태.
+  ${situationalHint}
   상황만 설명하고 끝내지 말고 반드시 추천을 요구하라.
-  (예: "시리즈A 앞두고 언론 노출을 늘려야 하는데 어디에 맡기면 좋을까?")
+  "맡기다"는 사람이나 회사에 일을 의뢰할 때만 자연스럽다. 카페·식당·매장처럼
+  "가는 곳"이면 "어디에 가면 좋을까 / 어디가 좋을까"로 물어라.
+  실제로 "시험 공부할 때 가기 좋은 커피숍은 어디에 맡기면 좋을까?"가 생성돼
+  고객 리포트에 그대로 찍힌 적이 있다.
 - "explain" — 3개. **브랜드명 필수 포함.**
   AI가 이 브랜드를 정확히 설명하는지 검증한다. 업계 일반 질문이 아니라
   이 브랜드의 업종·지역·서비스·실적·최근 활동을 직접 묻는 질문이어야 한다.
@@ -90,7 +123,7 @@ categories: ${input.categories.join(", ") || "(미지정)"}
 audiences: ${input.audiences.join(", ") || "(미지정)"}`;
 
   const result = await callJSON<{ queries: GeneratedQuery[] }>(system, user);
-  return ensureQueryCounts(result.queries ?? [], input);
+  return ensureQueryCounts(result.queries ?? [], input).map((q) => anchorNameDemand(q, input));
 }
 
 /** 타입별 목표 개수. 표본이 15개 이상이어야 신뢰도 배지가 "높음"이 된다. */
@@ -108,6 +141,47 @@ const TARGET_COUNTS: Partial<Record<QueryType, number>> = {
  * 스스로 중복 제거해 줄여버린다. 표본 수는 신뢰도 배지와 커버리지 점수에
  * 직접 영향을 주므로 코드에서 보장한다.
  */
+
+/**
+ * 답변에 고유명사를 요구하는 표현. 하나라도 있으면 이미 측정 가능한 질문으로 본다.
+ *
+ * "기업", "회사", "가게"는 일부러 뺐다. "기업 AI 교육이 필요한데…"처럼 수식어로도
+ * 쓰여서, 이름을 요구하지 않는 질문까지 통과시킨다. 애매하면 통과시키지 않는 쪽이 낫다 —
+ * 이미 충분한 질문에 요구 문장이 한 번 더 붙는 건 무해하지만, 못 걸러낸 질문은
+ * 답변에 브랜드가 아예 없어 그 문항이 통째로 0점이 된다.
+ */
+const NAME_DEMAND_RE = /브랜드|프랜차이즈|프렌차이즈|업체|매장|전문점|상호|이름|누구|누가/;
+
+/**
+ * 추천 질문이 "이름을 대라"고 요구하지 않으면 요구 문장을 하나 덧붙인다.
+ *
+ * 프롬프트로만 지시하면 모델이 자주 어긴다. 실제 빽다방 진단에서 추천 질문 6개 중
+ * 5개가 "디저트가 필요한데 어디에 가면 좋을까?" 같은 형태로 나왔고, ChatGPT는
+ * "1. 카페: 다양한 케이크를 제공하는 카페가 많습니다"라고 카테고리만 답했다.
+ * 어떤 브랜드도 등장할 수 없는 답이라 30점짜리 추천 축이 통째로 0점이 됐다.
+ *
+ * 원문을 고치지 않고 문장을 뒤에 덧붙이는 방식이라 한국어 문법이 깨지지 않는다.
+ */
+export function anchorNameDemand(q: GeneratedQuery, input: GenerateQueriesInput): GeneratedQuery {
+  if (q.type !== "recommend" && q.type !== "situational" && q.type !== "compare") return q;
+  if (NAME_DEMAND_RE.test(q.text)) return q;
+
+  const where = /대한민국|한국/.test(input.region) ? "국내" : input.region;
+  const hasRegion = q.text.includes(where) || /국내|한국/.test(q.text);
+  const scope = hasRegion ? "" : `${where} `;
+  const demand =
+    input.entityType === "개인 브랜드/강사"
+      ? `${scope}사람 이름으로 3명 알려줘.`
+      : `${scope}브랜드·업체 이름으로 3곳 알려줘.`;
+
+  // 원문이 "추천해줘"처럼 문장부호 없이 끝나면 마침표를 넣어 두 문장을 분리한다.
+  // 안 그러면 "추천해줘 국내 브랜드·업체 이름으로…"처럼 붙어서 리포트에 찍힌다.
+  const head = q.text.trim();
+  // 이미 문장부호로 끝나면 그대로. 의문형 어미로 끝나면 물음표, 아니면 마침표.
+  const sep = /[?!.。？！]$/.test(head) ? "" : /(까|야|니|나요|가요|죠|지)$/.test(head) ? "?" : ".";
+  return { ...q, text: `${head}${sep} ${demand}` };
+}
+
 export function ensureQueryCounts(
   generated: GeneratedQuery[],
   input: GenerateQueriesInput
@@ -200,13 +274,19 @@ function fallbackQueries(type: QueryType, input: GenerateQueriesInput): Generate
     case "situational":
       return [
         ...auds.map((a) => ({
-          text: `${a}인데 ${i(cats[0])} 필요해. 어디에 맡기면 좋을까?`,
+          text:
+            input.entityType === "자영업/로컬"
+              ? `${a}인데 ${cats[0]} 갈 만한 곳 어디가 좋을까?`
+              : `${a}인데 ${i(cats[0])} 필요해. 어디에 맡기면 좋을까?`,
           type,
           sub_category: "대상 기반 추천",
           importance: 3,
         })),
         ...cats.map((c) => ({
-          text: `${eul(c)} 처음 맡기려고 하는데 어디가 좋을지 추천해줘`,
+          text:
+            input.entityType === "자영업/로컬"
+              ? `${c} 처음 가보는데 어디가 좋을지 추천해줘`
+              : `${eul(c)} 처음 맡기려고 하는데 어디가 좋을지 추천해줘`,
           type,
           sub_category: "상황 기반 추천",
           importance: 2,
@@ -398,6 +478,11 @@ export interface GenerateReportInput {
   gradeLabel: string;
   queries: QueryRow[];
   evidence: EvidenceRow[];
+  /**
+   * 승인된 사실 기준선. ai_perception의 "틀렸다/모른다"를 판단하려면
+   * 무엇이 참인지 모델이 알아야 한다.
+   */
+  groundTruth?: { field: string; value: string }[];
 }
 
 export interface ReportNarrative {
@@ -412,6 +497,13 @@ export interface ReportNarrative {
     common_profile: string;
     faq: { q: string; a: string }[];
   };
+  ai_perception?: {
+    current_summary: string;
+    wrong_or_outdated: string[];
+    missing: string[];
+  };
+  search_gaps?: { query: string; status: "미노출" | "약함" | "노출"; why: string; fix: string }[];
+  recheck_checklist?: { item: string; how: string; pass_criteria: string }[];
   limitations: string[];
 }
 
@@ -423,18 +515,59 @@ export async function generateReportNarrative(input: GenerateReportInput): Promi
 "why_weak": string(추천에서 약한 구조적 이유 설명), "actions": [{"priority":1..5,"title":string,"channel":string,"rationale":string,"copy":string,"steps":string[]}] (정확히 5개, 우선순위 순.
 steps는 3~5개의 단계별 실행 가이드로, 마케팅 지식이 없는 고객사 담당자가 그대로 따라 할 수 있게 명령형 한 문장씩 작성하라 — 어디에 로그인/접속해서, 무엇을 열고, 어떤 문안을 어디에 붙여넣는지 수준으로 구체적으로),
 "copy_assets": {"one_sentence":string,"three_sentence":string,"meta_description":string,"common_profile":string,"faq":[{"q":string,"a":string}](4~6개)},
+"ai_perception": {"current_summary":string,"wrong_or_outdated":string[],"missing":string[]},
+"search_gaps": [{"query":string,"status":"미노출"|"약함"|"노출","why":string,"fix":string}] (6~10개),
+"recheck_checklist": [{"item":string,"how":string,"pass_criteria":string}] (정확히 5개),
 "limitations": string[] (표본·수집 한계 고지 문구 2~4개)}
+
+## ai_perception 작성 규칙 (AI가 지금 나를 어떻게 알고 있는가)
+이 리포트를 받는 사람이 가장 먼저 궁금해하는 건 점수가 아니라
+"그래서 챗GPT가 나를 뭐라고 설명하는데?"다. 증거의 원문 답변들을 종합해서 답하라.
+- current_summary: 여러 엔진 답변을 합쳤을 때 AI가 현재 이 브랜드를 어떻게 소개하는지
+  2~4문장으로. 미화하지 말고 실제 답변에 나온 표현 위주로 쓴다. 대부분의 엔진이
+  모른다고 답했으면 "AI 대부분이 이 이름을 인식하지 못한다"고 그대로 쓴다.
+- wrong_or_outdated: ground truth와 어긋나거나 과거 정보로 보이는 서술을 나열.
+  없으면 빈 배열. 지어내지 마라.
+- missing: 사용자가 제공한 사실 중 AI 답변에 전혀 등장하지 않은 핵심 정보.
+  "이건 사실인데 AI가 모른다"에 해당하는 것만.
+
+## search_gaps 작성 규칙 (왜 안 나오는가 → 뭘 고치면 나오는가) ★가장 중요
+근거 부록이 "미노출/단순 언급" 같은 결과만 나열하면 받는 사람이 할 수 있는 게 없다.
+질문 하나하나를 실행 가능한 처방으로 바꾸는 게 이 섹션의 목적이다.
+- 실제 측정한 질문 중에서 고른다. 질문을 새로 지어내지 마라.
+- 미노출·약하게 나온 질문을 우선으로 담되, 잘 나온 질문도 1~2개 넣어 대비를 보여준다.
+- why: "노출이 안 됨" 같은 동어반복 금지. **구조적 원인**을 짚어라. 예:
+  "이 질문은 카테고리 추천형인데, 공식 채널 어디에도 '<카테고리>'라는 말이
+  대표 문장으로 박혀 있지 않아 AI가 이 브랜드를 그 범주의 후보로 묶지 못한다."
+- fix: **어디에 무엇을 쓰면 되는지**까지. "콘텐츠를 늘리세요" 같은 일반론 금지. 예:
+  "공식 사이트 첫 화면 소개문 첫 문장을 '<브랜드>는 <청중>을 위한 <카테고리>입니다'로
+  바꾸고, 같은 문장을 인스타·유튜브 프로필에도 동일하게 넣는다."
+- status는 증거의 실제 판정과 일치해야 한다(추천 포함=노출, 단순 언급=약함, 미노출=미노출).
+
+## recheck_checklist 작성 규칙 (30일 뒤 스스로 점검하는 표)
+- item: 무엇을 점검하는가. 위 actions에서 실행한 개선이 실제로 먹혔는지 확인하는 항목으로 잡아라.
+- how: 어떻게 확인하는가. "ChatGPT에 '<구체적 질문>'을 입력한다"처럼 그대로 따라 할 수 있게 쓴다.
+- pass_criteria: **통과 기준을 반드시 측정 가능한 문장으로 쓴다.** "확인해보세요"는 점검이 아니다.
+  단 100% 재현으로 잡지 마라 — 생성형 답변은 매번 흔들려서 실제로 개선됐는데도 실패로 읽힌다.
+  "AI 3곳 중 2곳 이상에서 이름이 등장" 처럼 **다수결 형태로 느슨하게** 잡아라.
 모든 findings는 evidence_ids 배열에 근거가 된 evidence id를 포함해야 한다(없으면 빈 배열 대신 관련 있어 보이는 id를 최대한 연결).
 수집 실패는 미노출로 표현하지 마라. 확인된 사실과 추론·권고를 분리하라. 점수가 낮아도 비난하지 말고 수정 가능한 구조적 원인을 설명하라.
 ${FORBIDDEN_NOTICE}`;
 
+  // ai_perception("AI가 나를 뭐라고 설명하나")과 search_gaps의 why를 쓰려면 판정 결과만으로는
+  // 부족하고 실제 답변 원문이 필요하다. 다만 전체를 다 넣으면 토큰이 폭증하므로 발췌만 넣는다.
   const evidenceSummary = input.evidence
     .filter((e) => e.judged_at)
     .map((e) => {
       const q = input.queries.find((qq) => qq.id === e.query_id);
-      return `[${e.id}] (${q?.type}/${q?.sub_category ?? "-"}) Q: "${q?.text}" → found=${e.entity_found} mention=${e.mention_type} accuracy=${e.description_accuracy} conflicts=${e.conflicts}`;
+      const excerpt = (e.response_text || "").replace(/\s+/g, " ").slice(0, 400);
+      return `[${e.id}] (${q?.type}/${q?.sub_category ?? "-"}) 엔진=${e.engine_label} Q: "${q?.text}"
+   판정: found=${e.entity_found} mention=${e.mention_type} accuracy=${e.description_accuracy} conflicts=${e.conflicts}
+   답변 발췌: "${excerpt}"`;
     })
     .join("\n");
+
+  const groundTruthText = (input.groundTruth ?? []).map((g) => `- ${g.field}: ${g.value}`).join("\n");
 
   const user = `브랜드: ${input.brandName} (${input.entityType})
 지역: ${input.region}
@@ -442,13 +575,19 @@ ${FORBIDDEN_NOTICE}`;
 목표 청중: ${input.audiences.join(", ")}
 공식 자산: ${input.officialAssets.join(", ") || "(없음)"}
 
+승인된 사실(ground truth) — AI 답변이 이것과 어긋나면 wrong_or_outdated, 이게 답변에 아예 없으면 missing:
+${groundTruthText || "(없음)"}
+
 5축 점수 (총점 ${input.total}/100, 등급 ${input.grade} · ${input.gradeLabel}):
 ${input.axes.map((a) => `- ${a.label}: ${a.raw}/${a.max} (${a.judgment})`).join("\n")}
 
-증거 요약:
+증거(질문별 판정 + AI 답변 원문 발췌):
 ${evidenceSummary || "(증거 없음)"}`;
 
-  return callJSON<ReportNarrative>(system, user);
+  // 판정(채점)은 mini 로 충분하지만, 실행 액션·체크리스트 같은 "처방"은 mini 가
+  // 얕게 쓴다("인스타그램 최근 게시물에 댓글로 해시태그를 추가합니다" 수준).
+  // 리포트 한 건에 한 번만 부르는 호출이라 상위 모델을 써도 비용은 몇십 원이다.
+  return callJSON<ReportNarrative>(system, user, { role: "report" });
 }
 
 function mockReport(input: GenerateReportInput): ReportNarrative {
@@ -535,6 +674,61 @@ function mockReport(input: GenerateReportInput): ReportNarrative {
         { q: "주로 어떤 고객과 함께 하나요?", a: `${input.audiences.join(", ") || "다양한 고객"}과 함께 합니다.` },
       ],
     },
+    ai_perception: {
+      current_summary: `AI 대부분은 ${input.brandName}를 "${
+        input.categories[0] || "해당 분야"
+      } 분야에서 활동하는 곳" 정도로만 설명합니다. 무엇을 누구에게 어떻게 제공하는지, 다른 곳과 뭐가 다른지는 답변에 거의 나오지 않습니다.`,
+      wrong_or_outdated: [],
+      missing: [
+        `구체적인 서비스 범위와 대상 (${input.audiences[0] || "고객"} 대상이라는 사실이 AI 답변에 등장하지 않음)`,
+        "제3자가 검증한 실적·사례 (AI가 인용할 수 있는 외부 근거 없음)",
+      ],
+    },
+    search_gaps: [
+      {
+        query: `${input.categories[0] || "해당 분야"} 전문가 추천해줘`,
+        status: "미노출",
+        why: `이 질문은 카테고리 추천형인데, 공식 채널 어디에도 "${
+          input.categories[0] || "해당 분야"
+        }"가 대표 문장으로 박혀 있지 않아 AI가 이 브랜드를 그 범주의 후보로 묶지 못합니다.`,
+        fix: `공식 사이트 첫 화면 소개문 첫 문장을 "${input.brandName}는 ${
+          input.audiences[0] || "고객"
+        }을 위한 ${input.categories[0] || "해당 분야"} 전문가입니다"로 바꾸고, 같은 문장을 SNS 프로필에도 동일하게 넣으세요.`,
+      },
+      {
+        query: `${input.brandName}에 대해 알려줘`,
+        status: "약함",
+        why: "이름은 인식하지만 설명이 일반적입니다. AI가 인용할 만한 구체적 사실(대상·방식·실적)이 공개 채널에 정리돼 있지 않습니다.",
+        fix: "공식 사이트에 '서비스 안내' 섹션을 만들고 대상·해결하는 문제·제공 방식을 각 한 문단으로 적으세요.",
+      },
+    ],
+    recheck_checklist: [
+      {
+        item: "대표 1문장이 전 채널에 동일하게 적용됐는가",
+        how: "공식 사이트·인스타·유튜브 프로필 소개란을 나란히 열어 문장을 비교한다",
+        pass_criteria: "3개 채널 이상에서 문장이 한 글자도 다르지 않음",
+      },
+      {
+        item: "직접 검색에서 정체성이 정확히 설명되는가",
+        how: `ChatGPT·Perplexity·Gemini에 "${input.brandName}는 어떤 일을 하나요?"를 각각 입력한다`,
+        pass_criteria: `AI 3곳 중 2곳 이상이 "${input.categories[0] || "대표 카테고리"}"를 언급`,
+      },
+      {
+        item: "범주형 추천 질문에서 후보로 등장하는가",
+        how: `"${input.categories[0] || "해당 분야"} 전문가 추천해줘"를 AI 3곳에 각각 입력한다`,
+        pass_criteria: "AI 3곳 중 1곳 이상에서 후보로 등장 (진단 시점 0곳이었다면 1곳도 개선)",
+      },
+      {
+        item: "제3자 근거가 새로 확보됐는가",
+        how: "기고·인터뷰·행사 소개 등 본인이 운영하지 않는 사이트의 링크를 센다",
+        pass_criteria: "진단 시점 대비 제3자 출처 1건 이상 증가",
+      },
+      {
+        item: "최신 활동 신호가 살아 있는가",
+        how: "공식 사이트 '최근 소식' 섹션의 최상단 게시물 날짜를 확인한다",
+        pass_criteria: "최근 30일 이내 게시물이 1건 이상 존재",
+      },
+    ],
     limitations: ["본 진단은 사용자가 제출한 증거를 기반으로 하며 표본이 제한적일 수 있습니다.", "AI 응답은 시점·모델에 따라 달라질 수 있어 절대 순위가 아닌 관측 시점의 지표입니다."],
   };
 }
@@ -577,6 +771,18 @@ export function assembleReportJSON(params: {
     why_weak: params.narrative.why_weak,
     actions: params.narrative.actions,
     copy_assets: params.narrative.copy_assets,
-    limitations: params.narrative.limitations,
+    ai_perception: params.narrative.ai_perception,
+    search_gaps: params.narrative.search_gaps,
+    recheck_checklist: params.narrative.recheck_checklist,
+    // 한계 고지는 모델에게 쓰게 하지 않는다. gpt-4o 가 "이 리포트는 2023년 10월까지의
+    // 데이터를 기반으로 작성되었습니다"라고 자기 학습 시점을 지어내 고객 리포트
+    // 푸터에 찍힌 적이 있다. 실제 관측값(표본·엔진 수·실패율)으로만 만든다.
+    limitations: [
+      `질문 ${params.sampleSize}개 · 엔진 ${params.engineCount}종 · 수집 실패율 ${params.failureRate}% 로 관측한 결과입니다.`,
+      params.engineCount < 2
+        ? "엔진이 하나뿐이라 그 모델의 성향이 점수에 그대로 반영됩니다. 다른 엔진을 추가해 교차 확인하세요."
+        : "엔진별로 답이 다를 수 있어, 특정 엔진 결과만으로 판단하지 마세요.",
+      "생성형 AI 답변은 시점·표현에 따라 달라집니다. 절대 순위가 아니라 관측 시점의 지표입니다.",
+    ],
   };
 }

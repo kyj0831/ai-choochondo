@@ -1,0 +1,145 @@
+#!/bin/zsh
+# AI 추천도 진단 — API 키 설정 (더블클릭 실행용, macOS)
+#
+# 터미널 명령을 몰라도 키를 넣을 수 있게 만든 창구다.
+# 키를 붙여넣으면 .env.local에 기록하고, 기존 키가 있으면 교체한다.
+# 여러 엔진 키를 한 번에 순서대로 넣을 수 있다 — 근거(출처)가 필요하면
+# 최소 Perplexity 키까지는 넣는 걸 권장한다.
+
+cd "$(dirname "$0")"
+
+# .env.local이 없으면 예시 파일에서 만든다
+if [ ! -f .env.local ]; then
+  cp .env.local.example .env.local 2>/dev/null || touch .env.local
+fi
+
+# 인자: 1=env변수명, 2=사람이 읽는 이름, 3=발급 페이지, 4=키 접두사(형식 검증용)
+set_key() {
+  # [[:space:]]## (1회 이상) 패턴을 쓰기 위해 이 함수 안에서만 확장 글로브를 켠다.
+  setopt localoptions extendedglob
+  local VARNAME="$1"
+  local LABEL="$2"
+  local URL="$3"
+  local PREFIX="$4"
+
+  echo ""
+  echo "───────────────────────────────────────────────"
+  echo "  $LABEL"
+  echo "───────────────────────────────────────────────"
+  echo "  발급: $URL"
+  echo ""
+  echo "  ※ 마우스로 클릭할 필요 없습니다. 창을 활성화한 뒤 Command+V 로"
+  echo "     붙여넣고 엔터를 누르세요."
+  echo "  ※ 붙여넣어도 화면에는 아무것도 보이지 않습니다 (일부러 숨김). 정상입니다."
+  echo "  ※ 건너뛰려면 아무것도 안 하고 그냥 엔터."
+  echo ""
+  # -s 로 입력을 화면에 찍지 않는다. 화면 캡처로 키가 노출되는 사고를 막기 위함.
+  read -s "KEY?$LABEL 키 붙여넣기 > "
+  echo ""
+
+  # 앞뒤 공백을 모두 턴다(붙여넣기 때 공백·탭이 섞여 들어오는 일이 흔하다).
+  KEY="${KEY##[[:space:]]##}"
+  KEY="${KEY%%[[:space:]]##}"
+  # "OPENAI_API_KEY=sk-..." 처럼 줄 전체를 붙여넣은 경우 변수명을 떼어낸다.
+  KEY="${KEY#${VARNAME}=}"
+  KEY="${KEY##[[:space:]]##}"
+  # 따옴표로 감싸 붙여넣은 경우도 벗긴다.
+  KEY="${KEY#\"}"; KEY="${KEY%\"}"
+  KEY="${KEY#\'}"; KEY="${KEY%\'}"
+
+  if [ -z "$KEY" ]; then
+    echo "→ 건너뜁니다."
+    return
+  fi
+
+  # 예시 문구(sk-... 같은 자리표시자)를 진짜 키로 저장하면, 앱이 키가 있다고
+  # 착각해 실제 호출을 시도하다 401 Incorrect API key 로 죽는다. 아예 막는다.
+  if [[ "$KEY" == *"..."* || ${#KEY} -lt 20 ]]; then
+    echo "❌ 이건 실제 키가 아니라 예시 문구로 보입니다 (또는 너무 짧습니다)."
+    echo "   저장하지 않고 건너뜁니다. 발급 페이지에서 받은 긴 문자열을 붙여넣어 주세요."
+    return
+  fi
+
+  if [[ -n "$PREFIX" && "$KEY" != ${PREFIX}* ]]; then
+    echo "⚠ 이 키는 보통 '${PREFIX}'로 시작합니다. 다른 키를 잘못 붙여넣은 건 아닌지 확인하세요."
+    echo "  그래도 이대로 저장합니다."
+  fi
+
+  grep -v "^[[:space:]]*${VARNAME}=" .env.local > .env.local.tmp 2>/dev/null || true
+  mv .env.local.tmp .env.local
+  echo "${VARNAME}=$KEY" >> .env.local
+
+  local MASKED="${KEY:0:7}...${KEY: -4}"
+  echo "✅ 저장됨: $MASKED"
+}
+
+echo ""
+echo "═══════════════════════════════════════════════"
+echo "  AI 추천도 진단 — API 키 설정"
+echo "═══════════════════════════════════════════════"
+echo ""
+echo "필요한 키만 넣으세요. 전부 선택 사항이며, 건너뛰려면 그냥 엔터만"
+echo "누르면 됩니다. 나중에 이 파일을 다시 실행해 추가/교체할 수 있습니다."
+echo ""
+echo "  · OpenAI    — 판정(채점)에 필수. 없으면 데모 모드로 동작합니다."
+echo "  · Perplexity — '근거 부록'에 실제 출처 링크가 나오게 하려면 이걸 넣으세요."
+echo "                 (다른 AI는 기본적으로 인터넷 검색을 안 해서 출처가 잘 안 붙습니다)"
+echo "  · Claude, Gemini — 여러 AI에서 동시에 자동 수집하고 싶을 때 추가로."
+echo ""
+
+set_key "OPENAI_API_KEY" "OpenAI (ChatGPT / 판정용, 필수)" "https://platform.openai.com/api-keys" "sk-"
+set_key "PERPLEXITY_API_KEY" "Perplexity (근거·출처 링크용, 추천)" "https://www.perplexity.ai/settings/api" "pplx-"
+set_key "ANTHROPIC_API_KEY" "Anthropic / Claude (선택)" "https://console.anthropic.com/settings/keys" "sk-ant-"
+set_key "GEMINI_API_KEY" "Google Gemini (선택)" "https://aistudio.google.com/apikey" ""
+
+echo ""
+echo "저장 위치: $(pwd)/.env.local (이 파일은 깃헙에 올라가지 않습니다)"
+# ── 서버 다시 켜기 ─────────────────────────────────────────────
+# 키를 저장해도 이미 돌고 있는 서버는 예전 키를 그대로 쓴다. 여기서 직접
+# 껐다 켠다 — "서버 창에서 Control+C 하세요"에서 막히는 일이 반복돼서다.
+free_port_3000() {
+  command -v lsof >/dev/null 2>&1 || return 0
+  local tries=0 pids
+  while true; do
+    pids=$(lsof -ti tcp:3000 2>/dev/null)
+    [ -z "$pids" ] && return 0
+    tries=$((tries + 1))
+    [ "$tries" -gt 12 ] && return 1
+    if [ "$tries" -le 3 ]; then
+      echo "$pids" | xargs kill 2>/dev/null
+    else
+      echo "$pids" | xargs kill -9 2>/dev/null
+    fi
+    sleep 1
+  done
+}
+
+echo ""
+echo "═══════════════════════════════════════════════"
+echo "  서버를 새 키로 다시 켭니다"
+echo "═══════════════════════════════════════════════"
+
+if command -v lsof >/dev/null 2>&1 && [ -n "$(lsof -ti tcp:3000 2>/dev/null)" ]; then
+  echo ""
+  echo "▸ 예전 키로 돌고 있던 서버를 끕니다..."
+  if ! free_port_3000; then
+    echo ""
+    echo "⚠️  돌아가는 서버를 끄지 못했습니다."
+    echo "   맥을 다시 시작한 뒤 start.command 를 더블클릭해주세요."
+    read -r "?엔터를 누르면 창이 닫힙니다..."
+    exit 1
+  fi
+fi
+
+if [ ! -f ./start.command ]; then
+  echo ""
+  echo "⚠️  start.command 를 찾을 수 없습니다. 같은 폴더의 start.command 를 직접 더블클릭해주세요."
+  read -r "?엔터를 누르면 창이 닫힙니다..."
+  exit 1
+fi
+
+echo ""
+echo "  '✅ API 키가 확인되었습니다' 가 뜨면 성공입니다."
+echo "  이 창은 끄지 마세요 — 끄면 서버도 꺼집니다."
+echo ""
+exec zsh ./start.command

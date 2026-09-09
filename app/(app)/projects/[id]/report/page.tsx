@@ -139,6 +139,17 @@ export default function ReportPage({ params }: { params: { id: string } }) {
         </div>
       </div>
 
+      {evidence.some((e) => e.is_sample === 1) && (
+        <div className="mb-6 rounded-lg border-2 border-red-500 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <p className="font-semibold">⚠ 데모(샘플) 리포트 — 실제 AI 진단 결과가 아닙니다</p>
+          <p className="mt-1 text-xs leading-relaxed text-red-700">
+            "샘플 답변으로 바로 체험하기"로 채운 가짜 답변이 포함돼 있어 점수·근거가 실제 측정값이
+            아닙니다. 어떤 브랜드를 넣어도 결과가 거의 같게 나옵니다. 고객에게 전달하지 마세요.
+            새 진단을 만들어 각 질문에 진짜 ChatGPT·Perplexity·Gemini 답변을 직접 붙여넣으세요.
+          </p>
+        </div>
+      )}
+
       {/* 1. 한 줄 진단 + 2. 총점/신뢰도 */}
       <div className="card p-6 mb-5">
         <p className="text-lg leading-relaxed mb-5">{r.summary.one_line}</p>
@@ -246,6 +257,72 @@ export default function ReportPage({ params }: { params: { id: string } }) {
         <h2 className="font-semibold mb-2">왜 추천에서 약한가</h2>
         <p className="text-sm text-slate-600 leading-relaxed">{r.why_weak}</p>
       </div>
+
+      {/* AI가 지금 우리를 어떻게 아는가 */}
+      {r.ai_perception && (
+        <div className="card p-6 mb-5">
+          <h2 className="font-semibold mb-2">AI는 지금 우리를 이렇게 알고 있다</h2>
+          <p className="text-sm text-slate-600 leading-relaxed mb-4">{r.ai_perception.current_summary}</p>
+          {r.ai_perception.wrong_or_outdated?.length > 0 && (
+            <div className="mb-3 border-l-2 border-red-400 pl-3">
+              <p className="text-xs font-semibold text-red-700 mb-1">틀렸거나 오래된 설명</p>
+              <ul className="text-xs text-slate-600 list-disc pl-4 space-y-0.5">
+                {r.ai_perception.wrong_or_outdated.map((x, i) => (
+                  <li key={i}>{x}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {r.ai_perception.missing?.length > 0 && (
+            <div className="border-l-2 border-amber-400 pl-3">
+              <p className="text-xs font-semibold text-amber-700 mb-1">AI가 모르는 핵심 정보</p>
+              <ul className="text-xs text-slate-600 list-disc pl-4 space-y-0.5">
+                {r.ai_perception.missing.map((x, i) => (
+                  <li key={i}>{x}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 검색 갭 — 왜 안 나오고 뭘 고치면 되는가 */}
+      {r.search_gaps && r.search_gaps.length > 0 && (
+        <div className="card p-6 mb-5">
+          <h2 className="font-semibold mb-1">검색 갭 — 왜 안 나오고, 뭘 고치면 나오는가</h2>
+          <p className="text-xs text-slate-400 mb-4">
+            실제로 물어본 질문 중 노출이 약한 것부터 정리했습니다. "이렇게 고친다"를 그대로 실행하면 다음 재점검에서 결과가 달라집니다.
+          </p>
+          <div className="space-y-3">
+            {r.search_gaps.map((g, i) => (
+              <div key={i} className="border border-slate-200 rounded-lg p-3">
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <p className="text-sm font-medium">{g.query}</p>
+                  <span
+                    className={`badge shrink-0 ${
+                      g.status === "노출"
+                        ? "bg-emerald-100 text-emerald-700"
+                        : g.status === "약함"
+                        ? "bg-amber-100 text-amber-700"
+                        : "bg-red-100 text-red-700"
+                    }`}
+                  >
+                    {g.status}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mb-1.5">
+                  <span className="font-semibold text-slate-600">왜: </span>
+                  {g.why}
+                </p>
+                <p className="text-xs text-slate-600">
+                  <span className="font-semibold text-brand-600">고치는 법: </span>
+                  {g.fix}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 7. 우선 액션 5개 + 단계별 실행 가이드 */}
       <div className="card p-6 mb-5">

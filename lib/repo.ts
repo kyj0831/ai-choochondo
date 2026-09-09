@@ -152,13 +152,21 @@ export function addEvidence(data: {
   engine_label: string;
   response_text: string;
   status: "collected" | "not_found" | "collection_failed";
+  is_sample?: boolean;
 }): EvidenceRow {
   const db = getDb();
   const id = uuid();
   db.prepare(
-    `INSERT INTO evidence (id, project_id, query_id, engine_label, response_text, status) VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(id, data.project_id, data.query_id, data.engine_label, data.response_text, data.status);
+    `INSERT INTO evidence (id, project_id, query_id, engine_label, response_text, status, is_sample) VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).run(id, data.project_id, data.query_id, data.engine_label, data.response_text, data.status, data.is_sample ? 1 : 0);
   return db.prepare(`SELECT * FROM evidence WHERE id = ?`).get(id) as EvidenceRow;
+}
+
+/** 이 프로젝트의 증거 중 하나라도 샘플(데모) 데이터로 채워진 게 있는지. */
+export function hasSampleEvidence(projectId: string): boolean {
+  const db = getDb();
+  const row = db.prepare(`SELECT 1 FROM evidence WHERE project_id = ? AND is_sample = 1 LIMIT 1`).get(projectId);
+  return !!row;
 }
 
 export function updateEvidenceJudgment(

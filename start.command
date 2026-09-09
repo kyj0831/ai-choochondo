@@ -62,6 +62,7 @@ if ! has_real_key; then
   echo "   3) OPENAI_API_KEY=sk-... 줄에 본인 키를 붙여넣고 저장"
   echo "   4) 이 창에서 Ctrl+C로 끄고 start.command를 다시 실행"
   echo ""
+  echo "   (더 쉬운 방법: 같은 폴더의 '키넣기.command' 를 더블클릭하세요.)"
   echo ""
   echo "   (데모 모드로 만든 리포트에는 표지에 경고가 찍히며, 고객에게 전달하면 안 됩니다.)"
   echo ""
