@@ -20,9 +20,17 @@ export async function authToken(password: string): Promise<string> {
  * 인증 없이 접근 가능한 경로.
  * AI 프로필 허브(/p/*)와 robots/sitemap은 반드시 공개여야 한다 —
  * AI 크롤러가 읽어가는 것이 그 페이지의 존재 이유이기 때문이다.
+ *
+ * HeyDay(/heyday)도 공개다. 실제 5060 사용자에게 링크를 보내 반응을 보는 것이
+ * 그 MVP의 목적이므로, 비밀번호 화면이 앞을 막으면 검증 자체가 불가능하다.
+ * 단 검증 결과 화면(/heyday/insights)에는 요청자 연락처가 들어 있어 제외한다.
  */
 export function isPublicPath(pathname: string): boolean {
+  if (pathname === "/heyday/insights") return false;
   return (
+    pathname === "/heyday" ||
+    pathname.startsWith("/heyday/") ||
+    pathname.startsWith("/api/heyday/") ||
     pathname.startsWith("/p/") || // 허브 페이지 및 llms.txt
     pathname === "/robots.txt" ||
     pathname === "/sitemap.xml" ||

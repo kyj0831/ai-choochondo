@@ -50,3 +50,13 @@ npm run dev
 - **포트 3000이 이미 사용 중**: `PORT=3001 npm run dev`로 다른 포트 사용
 - **better-sqlite3 오류**: `npm rebuild better-sqlite3` 실행
 - **데이터 초기화**: `data/app.sqlite` 파일 삭제 후 서버 재시작
+
+## HeyDay MVP (/heyday)
+
+같은 앱 안에 5060 온디맨드 메이트 플랫폼 **HeyDay**의 검증용 MVP가 들어 있습니다.
+서버를 띄운 뒤 <http://localhost:3000/heyday> 로 접속하세요.
+
+- 흐름: 하고 싶은 일 → 언제 → 어디서 → 메이트 선택 → 예약 요청 (5단계)
+- 결제는 하지 않습니다. 가격을 보여주고 예약 요청까지만 받습니다.
+- 검증 결과: <http://localhost:3000/heyday/insights>
+- 문서: `docs/heyday/PRD.md`, `docs/heyday/MVP-NOTES.md`

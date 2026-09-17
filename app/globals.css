@@ -37,3 +37,70 @@ body {
 .badge {
   @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold;
 }
+
+/* ──────────────────────────────────────────────────────────────────
+   HeyDay (/heyday)
+   5060 사용자를 위한 규칙을 유틸리티가 아니라 클래스로 못 박는다.
+   화면마다 글자·버튼 크기가 달라지면 그 자체가 장벽이 된다.
+   ────────────────────────────────────────────────────────────────── */
+
+/*
+ * @layer components 안에 두는 이유: Tailwind는 components 레이어를 utilities보다
+ * 먼저 출력한다. 레이어 밖에 두면 나중에 온 .hd-card가 .flex 같은 유틸리티를 이겨
+ * 화면에서 레이아웃이 조용히 깨진다.
+ */
+@layer components {
+  .hd-page {
+    @apply min-h-screen bg-sand-50 text-ink-900 text-[17px] leading-relaxed;
+  }
+
+  /* 터치 타깃은 최소 56px. 손끝이 둔해도 빗나가지 않는 크기다. */
+  .hd-btn {
+    @apply inline-flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-4
+           text-[18px] font-bold transition min-h-[56px]
+           disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  .hd-btn-primary {
+    @apply hd-btn bg-heyday-500 text-white shadow-sm hover:bg-heyday-600 active:bg-heyday-700;
+  }
+
+  .hd-btn-secondary {
+    @apply hd-btn bg-white text-ink-900 border-2 border-sand-300 hover:bg-sand-100;
+  }
+
+  /* 선택 카드. 화면당 선택지는 적게, 하나하나는 크게. */
+  .hd-card {
+    @apply block w-full rounded-2xl border-2 border-sand-200 bg-white p-5 text-left
+           transition hover:border-heyday-300 hover:bg-heyday-50/40
+           active:border-heyday-400;
+  }
+
+  .hd-card-selected {
+    @apply border-heyday-500 bg-heyday-50;
+  }
+
+  .hd-chip {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-sand-100 px-3 py-1.5
+           text-[14px] font-semibold text-ink-700;
+  }
+
+  .hd-badge-verified {
+    @apply inline-flex items-center gap-1 rounded-full bg-leaf-50 px-3 py-1
+           text-[14px] font-bold text-leaf-700;
+  }
+
+  .hd-price {
+    @apply text-[20px] font-extrabold text-ink-900;
+  }
+
+  .hd-input {
+    @apply w-full rounded-2xl border-2 border-sand-300 bg-white px-4 py-4 text-[18px]
+           placeholder:text-ink-400 focus:border-heyday-500 focus:outline-none
+           focus:ring-4 focus:ring-heyday-100;
+  }
+
+  .hd-label {
+    @apply mb-2 block text-[17px] font-bold text-ink-900;
+  }
+}
