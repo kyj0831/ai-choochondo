@@ -9,6 +9,39 @@ if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
 const dbPath = path.join(dataDir, "app.sqlite");
 
+/**
+ * 저장소 상태.
+ *
+ * "진단 목록이 비어 있다"는 화면만으로는 원인을 알 수 없다 — 처음 쓰는 것인지,
+ * 다른 폴더의 DB를 보고 있는 것인지, 재배포로 날아간 것인지가 전부 똑같이 보인다.
+ * 실제로 그 구분이 안 돼서 한참 헤맨 적이 있으므로, 앱이 자기 저장 위치를 말하게 한다.
+ */
+export function storageInfo() {
+  const isProduction = process.env.NODE_ENV === "production";
+  const hasExplicitDir = !!process.env.DATA_DIR;
+  return {
+    dbPath,
+    dataDir,
+    hasExplicitDir,
+    isProduction,
+    /**
+     * 배포 환경인데 DATA_DIR이 없으면 컨테이너 안 임시 디스크에 쓰고 있다.
+     * 재배포·재시작 때마다 진단·리포트·발행한 허브가 전부 사라진다.
+     */
+    ephemeral: isProduction && !hasExplicitDir,
+    projectCount: countProjects(),
+  };
+}
+
+function countProjects(): number {
+  try {
+    const row = getDb().prepare(`SELECT COUNT(*) AS c FROM projects`).get() as { c: number };
+    return row.c;
+  } catch {
+    return -1;
+  }
+}
+
 declare global {
   // eslint-disable-next-line no-var
   var __aiChoochondoDb: Database.Database | undefined;
@@ -160,6 +193,8 @@ function migrate(db: Database.Database) {
   // 샘플(데모) 증거로 채워진 진단을 리포트에서 구분하기 위한 표식.
   // 실제 AI 답변 없이 만들어진 리포트가 진짜 진단처럼 보이는 사고를 막는다.
   addColumnIfMissing(db, "evidence", "is_sample", "INTEGER NOT NULL DEFAULT 0");
+  // 소유 키 해시. NULL 이면 이 기능 전에 만든 진단 — 운영자 소유로 본다 (lib/owner.ts).
+  addColumnIfMissing(db, "projects", "owner_token_hash", "TEXT");
 }
 
 function addColumnIfMissing(db: Database.Database, table: string, column: string, ddl: string) {

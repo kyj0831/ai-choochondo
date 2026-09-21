@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getProject, listAssets, listFacts, listQueries, listEvidence, updateProjectMeta, getLatestReport } from "@/lib/repo";
+import { listAssets, listFacts, listQueries, listEvidence, updateProjectMeta, getLatestReport } from "@/lib/repo";
+import { requireProject, ownerTokenFor, claimPath } from "@/lib/owner";
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  const project = getProject(params.id);
+  const project = await requireProject(params.id);
   if (!project) return NextResponse.json({ error: "not found" }, { status: 404 });
   return NextResponse.json({
     project,
     assets: listAssets(params.id),
     facts: listFacts(params.id),
+    // 내 진단 링크. 이 브라우저가 소유 키를 들고 있을 때만 존재한다 — 운영자에게도 남의 키는 없다.
+    ownerLink: (() => { const t = ownerTokenFor(project); return t ? claimPath(project.id, t) : null; })(),
     queries: listQueries(params.id),
     evidence: listEvidence(params.id),
     latestReport: getLatestReport(params.id) || null,
@@ -15,7 +18,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const project = getProject(params.id);
+  const project = await requireProject(params.id);
   if (!project) return NextResponse.json({ error: "not found" }, { status: 404 });
   const body = await req.json();
   updateProjectMeta(params.id, {
@@ -24,5 +27,5 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     same_name_conflict: body.same_name_conflict !== undefined ? (body.same_name_conflict ? 1 : 0) : undefined,
     same_name_note: body.same_name_note,
   });
-  return NextResponse.json({ project: getProject(params.id) });
+  return NextResponse.json({ project: await requireProject(params.id) });
 }

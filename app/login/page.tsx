@@ -33,8 +33,8 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen grid place-items-center bg-slate-50 px-5">
       <form onSubmit={submit} className="card w-full max-w-sm p-8">
-        <h1 className="text-xl font-bold mb-1">AI 추천도 진단</h1>
-        <p className="text-sm text-slate-500 mb-6">진단 데이터를 보려면 비밀번호가 필요합니다.</p>
+        <h1 className="text-xl font-bold mb-1">운영자 로그인</h1>
+        <p className="text-sm text-slate-500 mb-6">전체 진단 목록을 보는 운영자 화면입니다. 사장님은 로그인 없이 자기 진단을 쓸 수 있습니다.</p>
 
         <label className="label" htmlFor="password">
           비밀번호
@@ -55,7 +55,7 @@ export default function LoginPage() {
         </button>
 
         <p className="mt-5 text-xs text-slate-400">
-          공개된 AI 프로필 허브 페이지는 비밀번호 없이 볼 수 있습니다.
+          진단 만들기와 내 진단 보기는 비밀번호가 필요 없습니다. 대시보드로 돌아가세요.
         </p>
       </form>
     </div>

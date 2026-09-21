@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { getHubBySlug, getProject, incrementHubView, recordCrawl } from "@/lib/repo";
+import { getHubBySlug, getProject, incrementHubView, listFacts, recordCrawl } from "@/lib/repo";
+import { publishableFacts } from "@/lib/facts";
 import { buildJsonLd, platformLabel, stripDraftMark } from "@/lib/hub";
 import { identifyBot } from "@/lib/crawlers";
 import { Hub } from "@/lib/types";
@@ -73,7 +74,10 @@ export default function HubPage({ params }: { params: { slug: string } }) {
 
   const disambiguation =
     project?.same_name_conflict && project.same_name_note ? project.same_name_note : null;
-  const jsonLd = buildJsonLd(hub, project?.entity_type ?? "기업/제품", url, disambiguation);
+  const entityType = project?.entity_type ?? "기업/제품";
+  const facts = listFacts(hub.project_id);
+  const factList = publishableFacts(entityType, facts);
+  const jsonLd = buildJsonLd(hub, entityType, url, disambiguation, facts);
   const accent = ACCENTS[hub.accent] ?? ACCENTS.indigo;
 
   const faq = hub.faq.filter((f) => f.q.trim() && f.a.trim());
@@ -126,6 +130,26 @@ export default function HubPage({ params }: { params: { slug: string } }) {
                 동명 주체와의 구분
               </h2>
               <p className="text-sm text-amber-900 leading-relaxed">{disambiguation}</p>
+            </section>
+          )}
+
+          {/*
+            확인된 사실 — 이 페이지의 존재 이유.
+            AI가 틀리게 말하는 영업시간·주소·영업 상태를 사업자가 직접 확인한 값으로 못 박는다.
+            그래서 소개문보다 위, 공식 채널보다 위에 둔다.
+          */}
+          {factList.length > 0 && (
+            <section className="mb-8">
+              <h2 className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-3">확인된 사실</h2>
+              <dl className="rounded-xl bg-white ring-1 ring-slate-200 divide-y divide-slate-100">
+                {factList.map((f) => (
+                  <div key={f.key} className="grid grid-cols-[7rem_1fr] gap-3 px-5 py-3">
+                    <dt className="text-sm text-slate-500">{f.key}</dt>
+                    <dd className="text-sm text-slate-900 whitespace-pre-line">{f.value}</dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="mt-2 text-xs text-slate-400">사업자 본인이 직접 확인한 현재 정보입니다. 다른 출처와 다르면 이 페이지가 최신입니다.</p>
             </section>
           )}
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getLatestReport, getProject, getReport, listEvidence, listQueries } from "@/lib/repo";
+import { getLatestReport, getReport, listEvidence, listQueries } from "@/lib/repo";
+import { requireProject } from "@/lib/owner";
 import { buildReportHtml } from "@/lib/reportHtml";
 import { ReportJSON } from "@/lib/types";
 
@@ -16,7 +17,7 @@ export const maxDuration = 60;
  *   /export?format=pdf&run=<id>  특정 회차
  */
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const project = getProject(params.id);
+  const project = await requireProject(params.id);
   if (!project) return NextResponse.json({ error: "프로젝트를 찾을 수 없습니다." }, { status: 404 });
 
   const runId = req.nextUrl.searchParams.get("run");

@@ -21,7 +21,10 @@ for L in en_US.UTF-8 ko_KR.UTF-8 C.UTF-8 C.utf8; do
   fi
 done
 
-REPO_ZIP="https://codeload.github.com/kyj0831/ai-choochondo/zip/refs/heads/main"
+# 어느 브랜치를 받을지. 허브·소유권 작업이 main 에 합쳐지기 전까지는 이 브랜치가 최신이다.
+# 합쳐진 뒤에는 "main" 으로 바꾼다 — 그 한 줄이면 된다.
+BRANCH="claude/ai-discoverability-prd"
+REPO_ZIP="https://codeload.github.com/kyj0831/ai-choochondo/zip/refs/heads/$BRANCH"
 SELF="$(basename "$0")"
 
 # ── 이 파일이 올바른 폴더에 있는지 먼저 확인한다 ────────────────────
@@ -145,14 +148,16 @@ else
 fi
 
 # 그래도 이름이 깨졌다면(#Uxxxx 형태) 원래 한글 이름으로 되돌린다.
-for f in "$TMP/ai-choochondo-main"/*(N); do
+# 압축이 풀린 폴더 이름은 "ai-choochondo-<브랜치>" 인데 브랜치의 / 는 - 로 바뀐다. 이름을 박지 않고 찾는다.
+SRC=$(ls -d "$TMP"/ai-choochondo-*/ 2>/dev/null | head -1); SRC="${SRC%/}"
+[ -n "$SRC" ] || fail "내려받은 내용이 예상과 다릅니다. 다시 실행해주세요."
+for f in "$SRC"/*(N); do
   base="${f:t}"
   [[ "$base" == *'#U'* ]] || continue
   decoded=$(printf '%b' "${base//\#U/\\u}")
   [ -n "$decoded" ] && [ "$decoded" != "$base" ] && mv -f "$f" "${f:h}/$decoded"
 done
 
-SRC="$TMP/ai-choochondo-main"
 [ -f "$SRC/package.json" ] || fail "내려받은 내용이 예상과 다릅니다. 다시 실행해주세요."
 
 # ── 3. 코드만 교체 ──────────────────────────────────────────────

@@ -1,4 +1,5 @@
-import { EntityType, Hub, HubInput, HubLink, OfficialAsset, Project, ReportJSON } from "./types";
+import { EntityType, GroundTruthFact, Hub, HubInput, HubLink, OfficialAsset, Project, ReportJSON } from "./types";
+import { coreFactCoverage, publishableFacts } from "./facts";
 
 /**
  * AI 프로필 허브의 목적:
@@ -142,7 +143,18 @@ function markDraft(s: string | undefined): string {
 
 /**
  * 발행 가능 여부를 판정한다.
- * 자동 초안이 그대로 남아 있거나 핵심 필드가 비어 있으면 공개를 막는다.
+ *
+ * 막는 기준은 하나다 — **검증되지 않은 내용이 공개되는가.**
+ * 자동 생성 문구([초안])는 사용자가 확인하지 않은 서술이므로 공개되면 안 된다.
+ *
+ * 반대로 '빈 항목'은 막지 않는다. 답이 비어 있는 FAQ와 설명이 비어 있는 서비스는
+ * 공개 페이지·JSON-LD·llms.txt 어디에도 애초에 나가지 않기 때문이다(각 빌더가
+ * 이미 filter로 걸러낸다). 나가지도 않는 항목 때문에 발행을 막으면 지켜지는 것은
+ * 없고 사장님만 붙잡힌다.
+ *
+ * 이 구분이 중요한 이유: 초안 생성기가 키워드로 서비스를, 미노출 질의로 FAQ를
+ * 자동으로 만들어 둔다. 그것들을 발행 조건으로 삼으면 앱이 스스로 낸 숙제로
+ * 스스로를 막는 꼴이 된다. 실제로 그렇게 막혀 있었다.
  */
 export function canPublish(hub: Hub): { ok: boolean; blockers: string[] } {
   const blockers: string[] = [];
@@ -161,17 +173,18 @@ export function canPublish(hub: Hub): { ok: boolean; blockers: string[] } {
     blockers.push("공식 채널을 최소 1개 연결하세요.");
   }
 
-  const emptyFaq = hub.faq.filter((f) => f.q.trim() && !f.a.trim()).length;
-  if (emptyFaq > 0) {
-    blockers.push(`답변이 비어 있는 FAQ가 ${emptyFaq}개 있습니다. 답을 쓰거나 항목을 삭제하세요.`);
-  }
-
-  const emptyService = hub.services.filter((s) => s.title.trim() && !s.description.trim()).length;
-  if (emptyService > 0) {
-    blockers.push(`설명이 비어 있는 서비스가 ${emptyService}개 있습니다.`);
-  }
-
   return { ok: blockers.length === 0, blockers };
+}
+
+/**
+ * 발행은 되지만 공개 페이지에 나가지 않는 항목을 센다.
+ * 막지는 않되, 사장님이 "왜 내 FAQ가 안 보이지?"라고 묻기 전에 미리 알려주기 위한 것이다.
+ */
+export function skippedOnPublish(hub: Hub): { faq: number; services: number } {
+  return {
+    faq: hub.faq.filter((f) => f.q.trim() && !f.a.trim()).length,
+    services: hub.services.filter((s) => s.title.trim() && !s.description.trim()).length,
+  };
 }
 
 function safeParseArray(raw: string): string[] {
@@ -188,9 +201,17 @@ function safeParseArray(raw: string): string[] {
  * - 주 엔터티(Person/Organization/…)에 sameAs로 모든 공식 채널을 연결해 소유권을 선언
  * - FAQ가 있으면 FAQPage를 @graph에 함께 넣어 추천형 질의의 앵커로 쓰이게 한다
  */
-export function buildJsonLd(hub: Hub, entityType: string, pageUrl: string, disambiguation?: string | null) {
+export function buildJsonLd(
+  hub: Hub,
+  entityType: string,
+  pageUrl: string,
+  disambiguation?: string | null,
+  facts: GroundTruthFact[] = []
+) {
   const schemaType = schemaTypeFor(entityType);
   const sameAs = hub.links.map((l) => l.url).filter(Boolean);
+  const factList = publishableFacts(entityType, facts);
+  const factOf = (prop: string) => factList.find((f) => f.schema === prop)?.value;
 
   const entity: Record<string, unknown> = {
     "@type": schemaType,
@@ -208,12 +229,22 @@ export function buildJsonLd(hub: Hub, entityType: string, pageUrl: string, disam
 
   if (sameAs.length) entity.sameAs = sameAs;
   if (hub.keywords.length) entity.knowsAbout = hub.keywords;
-  if (hub.region) {
-    entity.areaServed = hub.region;
-    if (schemaType === "LocalBusiness" || schemaType === "ProfessionalService") {
-      entity.address = { "@type": "PostalAddress", addressLocality: hub.region, addressCountry: "KR" };
-    }
+  if (hub.region) entity.areaServed = hub.region;
+
+  // 사실 기준선에서 온 값이 우선한다. 사장님이 직접 확인한 주소·영업시간·전화가
+  // AI가 틀리게 말하는 바로 그 항목이고, 허브가 존재하는 이유다.
+  const street = factOf("streetAddress");
+  if (street) {
+    entity.address = { "@type": "PostalAddress", streetAddress: street, addressLocality: hub.region || undefined, addressCountry: "KR" };
+  } else if (hub.region && (schemaType === "LocalBusiness" || schemaType === "ProfessionalService")) {
+    entity.address = { "@type": "PostalAddress", addressLocality: hub.region, addressCountry: "KR" };
   }
+  const hours = factOf("openingHours");
+  if (hours) entity.openingHours = hours;
+  const tel = factOf("telephone");
+  if (tel) entity.telephone = tel;
+  const mail = factOf("email");
+  if (mail && !hub.contact_email) entity.email = mail;
   if (hub.headline) entity[schemaType === "Person" ? "jobTitle" : "slogan"] = hub.headline;
   if (hub.contact_email) entity.email = hub.contact_email;
   if (hub.audiences.length) {
@@ -263,7 +294,14 @@ export function buildJsonLd(hub: Hub, entityType: string, pageUrl: string, disam
  * llms.txt — AI 에이전트가 파싱하기 쉬운 평문 요약.
  * HTML 파싱 없이도 "이 브랜드가 무엇이고 공식 채널이 어디인가"를 한 번에 읽을 수 있게 한다.
  */
-export function buildLlmsTxt(hub: Hub, entityType: string, pageUrl: string, disambiguation?: string | null): string {
+export function buildLlmsTxt(
+  hub: Hub,
+  entityType: string,
+  pageUrl: string,
+  disambiguation?: string | null,
+  facts: GroundTruthFact[] = []
+): string {
+  const factList = publishableFacts(entityType, facts);
   const lines: string[] = [];
   lines.push(`# ${hub.display_name}`);
   lines.push("");
@@ -288,6 +326,15 @@ export function buildLlmsTxt(hub: Hub, entityType: string, pageUrl: string, disa
   if (hub.contact_email) lines.push(`- 문의: ${hub.contact_email}`);
   lines.push(`- 공식 프로필: ${pageUrl}`);
   lines.push("");
+
+  // 이 섹션이 허브의 핵심이다. AI가 틀리게 말하는 영업시간·주소·영업 상태를
+  // 사업자가 직접 확인한 값으로 못 박는다. 다른 출처와 다르면 이쪽이 맞다고 명시한다.
+  if (factList.length) {
+    lines.push("## 확인된 사실 (사업자 직접 확인)");
+    lines.push("아래는 사업자 본인이 직접 확인한 현재 정보입니다. 다른 출처의 정보와 다를 경우 이 문서가 최신입니다.");
+    for (const f of factList) lines.push(`- ${f.key}: ${f.value}`);
+    lines.push("");
+  }
 
   if (hub.bio) {
     lines.push("## 소개");
@@ -325,13 +372,27 @@ export function buildLlmsTxt(hub: Hub, entityType: string, pageUrl: string, disa
 }
 
 /** 허브가 AI에게 얼마나 읽히기 좋은지 점검한다. 편집 화면에서 완성도 가이드로 쓴다. */
-export function hubReadiness(hub: Hub): { score: number; items: { label: string; ok: boolean; hint: string }[] } {
+export function hubReadiness(
+  hub: Hub,
+  entityType: string = "기업/제품",
+  facts: GroundTruthFact[] = []
+): { score: number; items: { label: string; ok: boolean; hint: string }[] } {
+  const core = coreFactCoverage(entityType, facts);
   // 자동 초안과 빈 답변은 '미완성'으로 센다.
   // 공개 페이지에 실제로 나가는 내용만 완성도로 인정해야 발행 조건과 어긋나지 않는다.
   const completedFaq = hub.faq.filter((f) => f.q.trim() && f.a.trim()).length;
   const completedServices = hub.services.filter((s) => s.title.trim() && s.description.trim()).length;
 
   const items = [
+    {
+      // 허브가 존재하는 이유. 이게 비어 있으면 AI가 틀린 영업시간·주소를 고칠 재료가 없다.
+      label: "핵심 사실 입력 (기본 정보 단계)",
+      ok: core.total > 0 && core.filled === core.total,
+      hint:
+        core.missing.length > 0
+          ? `아직 비어 있음: ${core.missing.join(", ")}. AI가 틀리게 말하는 항목이 바로 이것들입니다. 기본 정보 화면에서 입력하면 허브에 자동으로 실립니다.`
+          : "사업자가 확인한 사실이 허브와 llms.txt에 실려 AI 답변의 정답지가 됩니다.",
+    },
     {
       label: "1문장 정의",
       ok: !isDraftText(hub.one_liner) && hub.one_liner.trim().length >= 10,

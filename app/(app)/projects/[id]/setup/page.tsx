@@ -4,16 +4,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import StepNav from "@/components/StepNav";
 import { GroundTruthFact, OfficialAsset, Project } from "@/lib/types";
+import { factFieldsFor } from "@/lib/facts";
 
 const PLATFORMS = ["공식 사이트", "인스타그램", "유튜브", "블로그/브런치", "네이버지도", "카카오맵", "기타 SNS", "저자/회사 페이지"];
 
-const FACT_FIELDS = [
-  { key: "직함/업종", placeholder: "예: AI 커뮤니케이터, 한식당 대표" },
-  { key: "지역", placeholder: "예: 서울 종로구" },
-  { key: "제공 서비스", placeholder: "예: 기업 강연, AI 활용 컨설팅" },
-  { key: "대표 실적", placeholder: "예: 000기업 강연 50회, OO상 수상" },
-  { key: "최근 활동", placeholder: "예: 2026년 6월 신간 출간" },
-];
 
 export default function SetupPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -162,9 +156,13 @@ export default function SetupPage({ params }: { params: { id: string } }) {
 
       <div className="card p-6 mb-5">
         <h2 className="font-semibold mb-1">사실 기준선 (Ground Truth)</h2>
-        <p className="text-xs text-slate-400 mb-3">AI 설명의 정확도를 판정하는 기준입니다. 확인된 사실만 입력하세요.</p>
+        <p className="text-xs text-slate-400 mb-3">
+          AI 설명의 정확도를 판정하는 기준이자, 발행하면 AI 프로필 허브에 그대로 실리는 공식 사실입니다. 확인된 것만
+          입력하세요.
+        </p>
+        {/* 항목은 업종 유형에 따라 다르다. 카페에는 영업시간이, 강사에게는 대표 실적이 필요하다. */}
         <div className="space-y-3">
-          {FACT_FIELDS.map((f) => (
+          {factFieldsFor(project.entity_type).map((f) => (
             <div key={f.key}>
               <label className="label">{f.key}</label>
               <input
