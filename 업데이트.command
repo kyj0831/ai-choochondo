@@ -21,9 +21,8 @@ for L in en_US.UTF-8 ko_KR.UTF-8 C.UTF-8 C.utf8; do
   fi
 done
 
-# 어느 브랜치를 받을지. 허브·소유권 작업이 main 에 합쳐지기 전까지는 이 브랜치가 최신이다.
-# 합쳐진 뒤에는 "main" 으로 바꾼다 — 그 한 줄이면 된다.
-BRANCH="claude/ai-discoverability-prd"
+# 어느 브랜치를 받을지. PR #30 으로 허브·소유권 작업이 main 에 합쳐졌으므로 main 이 최신이다.
+BRANCH="main"
 REPO_ZIP="https://codeload.github.com/kyj0831/ai-choochondo/zip/refs/heads/$BRANCH"
 SELF="$(basename "$0")"
 
