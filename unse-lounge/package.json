@@ -1,0 +1,18 @@
+{
+  "name": "unse-lounge",
+  "private": true,
+  "version": "0.1.0",
+  "description": "운세 라운지 — 사주·토정비결·궁합·타로 운세 서비스 (베타)",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "build": "echo \"빌드 단계 없음\"",
+    "dev": "MOCK_AI=1 node server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0"
+  }
+}
