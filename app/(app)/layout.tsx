@@ -16,8 +16,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <Link href="/" className="btn-ghost">
               대시보드
             </Link>
-            <Link href="/video-search" className="btn-ghost">
-              영상 찾기
+            <Link href="/bibl" className="btn-ghost">
+              BIBL 영상 찾기
             </Link>
             <Link href="/new" className="btn-primary !py-2">
               새 진단

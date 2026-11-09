@@ -179,6 +179,38 @@ function migrate(db: Database.Database) {
 
     CREATE INDEX IF NOT EXISTS idx_crawls_hub ON hub_crawls(hub_id, created_at DESC);
 
+    -- ── BIBL: 레퍼런스 보관함 ─────────────────────────────────────────
+    -- 회원가입 없이 브라우저별 열쇠(owner_hash)로 구분한다. lib/biblOwner.ts 참고.
+    CREATE TABLE IF NOT EXISTS bibl_boards (
+      id TEXT PRIMARY KEY,
+      owner_hash TEXT NOT NULL,
+      name TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS bibl_refs (
+      id TEXT PRIMARY KEY,
+      owner_hash TEXT NOT NULL,
+      board_id TEXT REFERENCES bibl_boards(id) ON DELETE SET NULL,
+      video_id TEXT NOT NULL,
+      video_json TEXT NOT NULL,
+      tags TEXT NOT NULL DEFAULT '[]',
+      note TEXT NOT NULL DEFAULT '',
+      analysis_json TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(owner_hash, video_id)
+    );
+    CREATE TABLE IF NOT EXISTS bibl_remixes (
+      id TEXT PRIMARY KEY,
+      ref_id TEXT NOT NULL REFERENCES bibl_refs(id) ON DELETE CASCADE,
+      topic TEXT NOT NULL,
+      result_json TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_bibl_refs_owner ON bibl_refs(owner_hash, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_bibl_boards_owner ON bibl_boards(owner_hash);
+    CREATE INDEX IF NOT EXISTS idx_bibl_remixes_ref ON bibl_remixes(ref_id, created_at DESC);
+
     CREATE INDEX IF NOT EXISTS idx_assets_project ON official_assets(project_id);
     CREATE INDEX IF NOT EXISTS idx_facts_project ON ground_truth_facts(project_id);
     CREATE INDEX IF NOT EXISTS idx_queries_project ON queries(project_id);

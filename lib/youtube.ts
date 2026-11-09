@@ -195,8 +195,26 @@ async function fetchVideoIds(p: SearchParams): Promise<string[]> {
 
 const REGION_LANG: Record<string, string> = { KR: "ko", US: "en", JP: "ja", GB: "en", TW: "zh-Hant", VN: "vi" };
 
+// 같은 조건의 검색은 6시간 동안 다시 부르지 않는다. 키워드 검색 1회가 쿼터 100단위라 아껴야 한다.
+const CACHE_MS = 6 * 60 * 60 * 1000;
+declare global {
+  // eslint-disable-next-line no-var
+  var __ytCache: Map<string, { at: number; data: VideoResult[] }> | undefined;
+}
+const cache = (global.__ytCache ??= new Map());
+
 export async function searchVideos(p: SearchParams): Promise<VideoResult[]> {
   if (!hasYoutubeKey()) return mockVideos(p);
+  const key = JSON.stringify(p);
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < CACHE_MS) return hit.data;
+  const data = await searchVideosUncached(p);
+  cache.set(key, { at: Date.now(), data });
+  if (cache.size > 300) cache.delete(cache.keys().next().value!);
+  return data;
+}
+
+async function searchVideosUncached(p: SearchParams): Promise<VideoResult[]> {
 
   const ids = await fetchVideoIds(p);
   if (ids.length === 0) return [];
