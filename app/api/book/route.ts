@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { allow, clientIp } from "@/lib/booking/rateLimit";
 import { z } from "zod";
 import { v4 as uuid } from "uuid";
 import { getBookingConfig } from "@/lib/booking/config";
@@ -32,6 +33,9 @@ function serialize<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 export async function POST(req: NextRequest) {
+  if (!allow(`book:${clientIp(req)}`, 5, 3600_000)) {
+    return NextResponse.json({ error: "예약 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요." }, { status: 429 });
+  }
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "입력값을 확인해 주세요.", issues: parsed.error.flatten().fieldErrors }, { status: 400 });

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { allow, clientIp } from "@/lib/booking/rateLimit";
 import { getBookingConfig } from "@/lib/booking/config";
 import { availableSlots, calendarMode } from "@/lib/booking/slots";
 
@@ -6,6 +7,9 @@ export const dynamic = "force-dynamic";
 
 /** GET /api/book/availability?start=ISO&end=ISO&duration=30 → { slots: ISO[] } */
 export async function GET(req: NextRequest) {
+  if (!allow(`avail:${clientIp(req)}`, 120, 600_000)) {
+    return NextResponse.json({ error: "요청이 너무 많습니다." }, { status: 429 });
+  }
   const cfg = getBookingConfig();
   const sp = req.nextUrl.searchParams;
   const duration = Number(sp.get("duration") || cfg.durations[0]);

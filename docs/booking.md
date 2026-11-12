@@ -51,3 +51,20 @@
 ## 기록
 
 예약은 `data/app.sqlite`의 `bookings` 테이블에도 남습니다.
+
+## 다른 사람이 쓰게 공개하기 (Railway)
+
+1. 이 코드가 `main` 브랜치에 들어가 있어야 Railway가 배포합니다.
+2. Railway → New Project → Deploy from GitHub repo → `kyj0831/ai-choochondo` (이미 배포돼 있으면 생략)
+3. Settings → Volumes 에서 `/data` 볼륨 추가, Variables 에 `DATA_DIR=/data`
+4. Settings → Networking → Generate Domain → 예: `https://○○○.up.railway.app`
+5. Variables 에 추가:
+   `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `BOOKING_ADMIN_KEY`,
+   `BOOKING_BASE_URL=https://○○○.up.railway.app`, 호스트 이름·회사 등(`BOOKING_HOST_*`)
+6. Google 콘솔 OAuth 클라이언트의 승인된 리디렉션 URI에
+   `https://○○○.up.railway.app/api/book/google/callback` 추가
+7. Google 콘솔 OAuth 동의 화면 → **프로덕션으로 게시** (안 하면 7일마다 연결이 끊김)
+8. `https://○○○.up.railway.app/api/book/google/connect?key=BOOKING_ADMIN_KEY값` 열어 캘린더 연결
+9. 공유할 링크: `https://○○○.up.railway.app/book`
+
+공개 API에는 IP별 횟수 제한이 걸려 있습니다(예약 5회/시간, AI 추천 20회/시간).
