@@ -183,6 +183,24 @@ ul.facts li { margin-bottom: 4px }
 .wishlist li.done .t { color: var(--ink-soft) }
 .wishlist .empty { display: block; color: var(--ink-soft); font-size: 13px; border: 0 }
 
+/* 오늘 해 말아? */
+.coin { width: 96px; height: 96px; max-width: 100%; border-radius: 50%; position: relative; margin: 6px auto 0;
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--earth) 55%, var(--sheet)), var(--earth) 72%);
+  border: 3px solid color-mix(in srgb, var(--earth) 70%, var(--ink)) }
+.coin::after { content: ""; position: absolute; inset: 36%; background: var(--sheet); border: 2px solid color-mix(in srgb, var(--earth) 70%, var(--ink)) }
+.coin.spin { animation: coinflip .9s ease-out }
+@keyframes coinflip { 0% { transform: rotateY(0) translateY(0) } 50% { transform: rotateY(900deg) translateY(-36px) } 100% { transform: rotateY(1800deg) translateY(0) } }
+.verdict { display: inline-block; margin: 16px 0 6px; padding: 6px 18px; border: 3px solid var(--seal); border-radius: 6px; color: var(--seal);
+  font: clamp(40px, 9vw, 56px)/1.15 var(--f-display); transform: rotate(-4deg); animation: stamp .35s ease-out }
+.verdict.mid { border-color: var(--earth); color: var(--earth) }
+.verdict.no { border-color: var(--water); color: var(--water) }
+@keyframes stamp { from { transform: rotate(-4deg) scale(1.6); opacity: 0 } to { transform: rotate(-4deg) scale(1); opacity: 1 } }
+@media (prefers-reduced-motion: reduce) { .coin.spin, .verdict { animation: none } }
+.yn-q { font: 18px/1.5 var(--f-head); margin: 0 }
+.ask-band { display: grid; gap: 10px; padding: 16px; margin-bottom: 14px; border: 1px solid var(--rule); border-radius: 4px; background: var(--sheet) }
+.ask-band form { display: flex; gap: 8px }
+.ask-band input { flex: 1 }
+.ask-band .btn { white-space: nowrap }
 .fb { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 10; max-width: calc(100vw - 32px) }
 .fb-open { box-shadow: 0 2px 10px rgba(0,0,0,.15) }
 .fb-panel { display: grid; gap: 10px; width: 320px; max-width: 100%; box-shadow: 0 4px 20px rgba(0,0,0,.18) }
@@ -214,6 +232,7 @@ footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--rule);
 .tbl-wrap { overflow-x: auto; margin-top: 18px }
 table.mon { border-collapse: collapse; width: 100%; font-size: 14px; font-variant-numeric: tabular-nums }
 table.mon th, table.mon td { text-align: left; padding: 8px 10px 8px 0; border-bottom: 1px solid var(--rule); vertical-align: top }
+table.mon td:first-child { white-space: nowrap }
 table.mon th { font-size: 12px; color: var(--ink-soft); font-weight: 500; border-bottom-color: var(--ink) }
 table.mon td.gz { font-family: var(--f-display); font-size: 17px; white-space: nowrap }
 table.mon tr.now td { background: color-mix(in srgb, var(--accent) 8%, transparent) }
@@ -803,6 +822,7 @@ ${t ? `뽑힌 괘: ${t.code}괘 (상괘 ${t.sang} ${TRIGRAM[t.sang - 1][0]}${TRI
         ${[["총운", "general"], ["재물", "money"], ["연애", "love"], ["일·학업", "job"]].map(([k, dm]) => `<tr><td>${k}</td><td>${RELTXT[dm][r]}</td><td class="st">${stars(STARS[dm][r])}</td></tr>`).join("")}
         </tbody></table></div>`; },
     fallback: c => `## 오늘의 한마디\n${DAY_MASTER[c.P.day[0]].split(".")[0]}. 오늘은 ${RELTXT.general[c.rel(todayP.day[0])]}` }),
+  { id: "haemala", cat: "today", name: "오늘 해 말아?", lead: "할까 말까 고민될 때, 오늘의 기운으로 답해 드립니다", kind: "yesno", ai: false },
   SAJU({ id: "todaycolor", cat: "today", name: "오늘의 행운 컬러", lead: "내 사주와 오늘의 기운으로 고른 행운의 색", ai: false, compact: true,
     moods: ["희망", "사랑"],
     extra: c => { const t = stemEl(todayP.day[0]), luck = (c.me + 4) % 5, avoid = (c.me + 3) % 5;
@@ -836,6 +856,8 @@ $("home").innerHTML = `
     return `<a class="color-band" href="#todaycolor"><span class="dots">${PALETTE[t].map(([n, h]) => `<i style="background:${h}" title="${n}"></i>`).join("")}</span>
       <span class="tx"><b>오늘의 행운 컬러</b> · ${gz(todayP.day)}일은 ${EL[t]}(${EL_K[t]})의 날, ${PALETTE[t].map(x => x[0]).join("·")} 색이 어울립니다.</span>
       <span class="go">내 사주로 고른 색 보기 →</span></a>`; })()}
+  <div class="ask-band"><b style="font-family:var(--f-head);font-size:16px">오늘 해 말아?</b>
+    <form id="homeAsk"><input id="homeQ" maxlength="60" placeholder="예: 오늘 먼저 연락해 볼까?" aria-label="고민 한 줄"><button class="btn" type="submit">엽전 던지기</button></form></div>
   <div class="color-band" style="cursor:default"><span class="tx"><b>1년 이용권 9,900원</b> · 유료 풀이 ${PAID_COUNT}종을 1년 동안 마음껏. 하나씩 사면 ${(PAID_COUNT * 900).toLocaleString()}원입니다.</span><span class="badge">베타 기간 무료</span></div>
   ${CATS.map(([k, n, d]) => `<section class="cat" id="cat-${k}"><div class="cat-head"><h3>${n}</h3><span>${d}</span></div><div class="items">
     ${PRODUCTS.filter(p => p.cat === k).map(p => `<a class="prod" href="#${p.id}"><span class="pn">${p.name}</span><span class="badge${p.ai ? "" : " free"}">${p.ai ? PRICE_LABEL : "무료"}</span><span class="pl">${p.lead}</span></a>`).join("")}
@@ -848,6 +870,7 @@ $("home").innerHTML = `
     </div><ul class="wishlist" id="wishList" aria-label="적어 둔 바람"></ul></div>
   </section>`;
 
+$("homeAsk").onsubmit = e => { e.preventDefault(); const q = $("homeQ").value.trim(); if (!q) { $("homeQ").focus(); return; } pendingQ = q; $("homeQ").value = ""; go("haemala"); };
 function go(id) { if (location.hash.slice(1) !== id) location.hash = id; else route(); }
 function route() {
   const id = location.hash.slice(1), p = byId[id];
@@ -874,6 +897,7 @@ function renderProduct(p) {
   if (p.kind === "couple") return renderCouple(p);
   if (p.kind === "tarot") return renderTarot(p);
   if (p.kind === "daily") return renderDaily(p);
+  if (p.kind === "yesno") return renderYesNo(p);
 }
 
 // ---- 사주형 상품 ----
@@ -949,6 +973,79 @@ function sajuResult(p, input, isExample) {
 }
 
 // ---- 궁합 ----
+// ---- 오늘 해 말아? ----
+// 같은 날·같은 질문·같은 사람에게는 늘 같은 답이 나온다 (다시 던져도 바뀌지 않는 점괘).
+const YN_DOMAINS = [
+  ["love", "연애·관계", /고백|연락|카톡|문자|데이트|소개팅|썸|헤어|재회|연애|결혼|프러포즈|만나|사과할/],
+  ["money", "돈·소비", /살까|사도|사야|구매|결제|투자|주식|코인|쇼핑|지를|지름|대출|적금|부동산|청약|팔까|매수|매도/],
+  ["job", "일·직장", /면접|이직|퇴사|지원|보고|회의|제안|협상|발표|사업|창업|출근|연봉|승진|계약|휴가/],
+  ["exam", "공부·시험", /시험|공부|원서|자격증|수능|토익|합격|과제/]
+];
+const YN_TIPS = {
+  general: ["생각났을 때 바로 시작하세요. 오늘은 첫걸음이 가볍습니다.", "해도 좋지만 욕심내지 말고 절반만 해 보세요.", "오늘은 쉬어 가는 날. 준비만 해 두고 실행은 내일로."],
+  love: ["먼저 다가가는 쪽이 웃게 됩니다. 짧고 다정하게.", "가볍게 안부부터. 큰 이야기는 다음 기회에.", "오늘은 마음을 정리하는 날. 보내려던 메시지는 임시저장만."],
+  money: ["꼭 필요한 것이라면 오늘이 괜찮은 날입니다. 단, 예산 안에서.", "장바구니에 담아 두고 하루만 더 생각해 보세요.", "오늘 지갑은 닫아 두세요. 내일 봐도 그대로 있습니다."],
+  job: ["준비한 만큼 보여 주기 좋은 날입니다. 자신 있게.", "의견은 내되 결정은 서두르지 마세요.", "오늘은 듣는 날. 중요한 결정은 하루 미루세요."],
+  exam: ["집중력이 좋은 날입니다. 어려운 과목부터.", "평소 루틴대로만 해도 충분합니다.", "무리한 벼락치기는 금물. 일찍 자는 것이 오늘의 공부입니다."]
+};
+const YN_VERDICT = [["해!", "오늘은 움직이는 쪽이 이깁니다.", ""], ["하되, 가볍게", "해도 되지만 힘을 빼고 하세요.", "mid"], ["오늘은 말아", "하루 미뤄도 늦지 않습니다.", "no"]];
+let pendingQ = "";
+function ynAnswer(q) {
+  const dom = (YN_DOMAINS.find(d => d[2].test(q)) || ["general", "생활"]);
+  let c = null; try { if (savedInput) c = buildCtx(savedInput); } catch (e) {}
+  const rel = c ? c.rel(todayP.day[0]) : null;
+  const r = rng(dateKey + "|" + q.replace(/\s+/g, "") + "|" + (savedInput?.date || ""));
+  let score = (rel ? STARS[dom[0]][rel] : 3) + [-1, 0, 0, 1][Math.floor(r() * 4)];
+  score = Math.max(1, Math.min(5, score));
+  const v = score >= 4 ? 0 : score === 3 ? 1 : 2;
+  // 오늘 기운이 맞는 시간: 일간을 돕거나(인성) 내가 펼치는(식상) 시간
+  let hours = [];
+  if (c) {
+    const nowB = Math.floor((now.getHours() + 1) / 2) % 12;
+    for (let hB = nowB === 0 && now.getHours() >= 23 ? 12 : nowB; hB <= 11 && hours.length < 2; hB++) {   // 오늘 남은 시간만
+      const hS = mod([0, 2, 4, 6, 8][todayP.day[0] % 5] + hB, 10), rr = c.rel(hS);
+      if (rr === "in" || rr === "sik") hours.push(`${BR[hB]}시(${hB === 0 ? 23 : 2 * hB - 1}~${hB === 0 ? 1 : 2 * hB + 1}시)`);
+    }
+  }
+  const verse = verseFor("yn" + dateKey + q, [["희망", "구함"], ["사랑", "희망"], ["위로", "희망"]][v]);
+  return { q, dom, c, rel, score, v, hours, verse };
+}
+function ynHtml(a, isExample) {
+  const [title, sub, cls] = YN_VERDICT[a.v];
+  return `<p class="hint">${TM}월 ${TD}일 · ${a.dom[1]} 고민${isExample ? '<span class="example">예시</span>' : ""}</p>
+    <p class="yn-q">“${esc(a.q)}”</p>
+    <div style="text-align:center"><div class="verdict ${cls}">${title}</div><p style="margin:4px 0 0;color:var(--ink-soft)">${sub}</p></div>
+    <div class="tbl-wrap"><table class="mon"><tbody>
+      <tr><td>오늘의 기운</td><td>${a.rel ? `${gz(todayP.day)}일은 나(${STEM[a.c.P.day[0]]}${EL[a.c.me]})에게 ${REL_NAME[a.rel]}의 날. ${RELTXT[a.dom[0]][a.rel]}` : `${gz(todayP.day)}일은 ${EL[stemEl(todayP.day[0])]}(${EL_K[stemEl(todayP.day[0])]}) 기운의 날입니다. 생년월일을 넣으면 내 사주로 더 정확히 봅니다.`}</td></tr>
+      <tr><td>이렇게</td><td>${YN_TIPS[a.dom[0]][a.v]}</td></tr>
+      ${a.hours.length ? `<tr><td>${a.v === 2 ? "꼭 해야 한다면" : "좋은 시간"}</td><td>${a.hours.join(", ")}</td></tr>` : ""}
+      <tr><td>점수</td><td class="st">${stars(a.score)}</td></tr>
+    </tbody></table></div>
+    ${a.dom[0] === "money" ? `<p class="hint" style="margin-top:6px">재미로만 참고하세요. 돈이 걸린 결정은 꼭 따져 보고 하세요.</p>` : ""}
+    <div class="reading">${md(verseMd(a.verse))}</div>`;
+}
+function renderYesNo(p) {
+  const who = savedInput ? (() => { try { const c = buildCtx(savedInput); return `내 사주(일간 ${STEM[c.P.day[0]]}${EL[c.me]}) 기준으로 봅니다.`; } catch (e) { return ""; } })() : "";
+  $("view").innerHTML = head(p) + `<div class="grid">
+    <form class="sheet" id="ynForm">
+      <label for="yQ">무엇을 할까 말까 고민인가요?<textarea id="yQ" maxlength="60" placeholder="예: 오늘 먼저 연락해 볼까?"></textarea></label>
+      <div class="chips" aria-label="예시 고민">${["먼저 연락해 볼까?", "그거 살까?", "오늘 운동 갈까?", "이직 면접 볼까?", "고백할까?"].map(t => `<button type="button" class="calbtn yn-chip" style="border:1px solid var(--rule);background:var(--paper);border-radius:12px;padding:2px 10px;font-size:13px;cursor:pointer">${t}</button>`).join("")}</div>
+      <button class="btn" type="submit">엽전 던지기</button>
+      <p class="hint">${who || `생년월일이 없으면 오늘의 기운만으로 봅니다. <a href="#sajupalja">정통사주</a>에서 한 번 입력하면 내 사주로 봅니다.`} 같은 날 같은 질문에는 같은 답이 나옵니다.</p>
+    </form>
+    <div class="result"><div class="coin" id="coin" aria-hidden="true"></div><div id="ynOut"></div></div></div>`;
+  document.querySelectorAll(".yn-chip").forEach(b => b.onclick = () => { $("yQ").value = b.textContent; $("yQ").focus(); });
+  const throwCoin = (q, isExample) => {
+    const coin = $("coin"); coin.classList.remove("spin"); void coin.offsetWidth; coin.classList.add("spin");
+    $("ynOut").innerHTML = `<p class="status" style="text-align:center">엽전이 도는 중…</p>`;
+    const reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    setTimeout(() => { $("ynOut").innerHTML = ynHtml(ynAnswer(q), isExample); }, reduce || isExample ? 0 : 900);
+  };
+  $("ynForm").onsubmit = e => { e.preventDefault(); const q = $("yQ").value.trim(); if (!q) { $("yQ").focus(); return; } throwCoin(q, false); };
+  if (pendingQ) { $("yQ").value = pendingQ; const q = pendingQ; pendingQ = ""; throwCoin(q, false); }
+  else { $("yQ").value = "오늘 먼저 연락해 볼까?"; $("ynOut").innerHTML = ynHtml(ynAnswer("오늘 먼저 연락해 볼까?"), true); }
+}
+
 const SAMHAP = [[8, 0, 4], [11, 3, 7], [2, 6, 10], [5, 9, 1]];
 const YUKHAP = [[0, 1], [2, 11], [3, 10], [4, 9], [5, 8], [6, 7]];
 function renderCouple(p) {
