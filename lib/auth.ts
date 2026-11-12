@@ -24,6 +24,8 @@ export async function authToken(password: string): Promise<string> {
 export function isPublicPath(pathname: string): boolean {
   return (
     pathname.startsWith("/p/") || // 허브 페이지 및 llms.txt
+    pathname === "/book" || // 외부인이 쓰는 미팅 예약 화면
+    pathname.startsWith("/api/book") ||
     pathname === "/robots.txt" ||
     pathname === "/sitemap.xml" ||
     pathname === "/login" ||
